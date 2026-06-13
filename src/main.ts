@@ -2,19 +2,39 @@ import './style.css';
 import { testOPFS } from './opfs';
 import { initGamepad } from './input';
 
-// 起動時に即実行する関数
+// 📱 スマホデバッグ用：もしエラーが起きたら画面に赤文字で強制表示する
+window.addEventListener('error', (event) => {
+  const overlay = document.getElementById("debug-overlay");
+  if (overlay) {
+    overlay.innerHTML += `<div style="color: #ff3366; margin-top: 10px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px;">🚨 エラー: ${event.message}</div>`;
+  }
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  const overlay = document.getElementById("debug-overlay");
+  if (overlay) {
+    overlay.innerHTML += `<div style="color: #ff3366; margin-top: 10px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px;">🚨 非同期エラー: ${event.reason}</div>`;
+  }
+});
+
 async function runValidation() {
-  const sabEl = document.getElementById("status-sab")!;
-  const opfsEl = document.getElementById("status-opfs")!;
-  const gamepadEl = document.getElementById("status-gamepad")!;
-  const screen = document.getElementById("deck-screen") as HTMLCanvasElement;
+  const sabEl = document.getElementById("status-sab");
+  const opfsEl = document.getElementById("status-opfs");
+  const gamepadEl = document.getElementById("status-gamepad");
+  const screen = document.getElementById("deck-screen");
+
+  // HTMLの要素がまだ生成されていなければ、0.1秒待って再挑戦（タイミング問題を完全解決）
+  if (!sabEl || !opfsEl || !gamepadEl || !screen) {
+    setTimeout(runValidation, 100);
+    return;
+  }
 
   // 1. クロスオリジン隔離 (SharedArrayBuffer) のチェック
   if (typeof SharedArrayBuffer !== "undefined") {
     sabEl.textContent = "有効（Wasmマルチスレッド解放！）";
     sabEl.className = "ok";
   } else {
-    sabEl.textContent = "無効（HTTPS接続、またはvercel.jsonの確認が必要です）";
+    sabEl.textContent = "無効（vercel.jsonの設定、またはHTTPS接続が必要です）";
     sabEl.className = "ng";
   }
 
@@ -44,7 +64,7 @@ async function runValidation() {
     e.preventDefault();
     scale += e.deltaY * -0.001;
     scale = Math.min(Math.max(0.5, scale), 3);
-    updateTransform();
+    (screen as HTMLElement).style.transform = `translate(${translateX}%, ${translateY}%) scale(${scale})`;
   }, { passive: false });
 
   screen.addEventListener("mousedown", () => isDragging = true);
@@ -53,13 +73,13 @@ async function runValidation() {
     if (!isDragging) return;
     translateX += (e.movementX / window.innerWidth) * 100;
     translateY += (e.movementY / window.innerHeight) * 100;
-    updateTransform();
+    (screen as HTMLElement).style.transform = `translate(${translateX}%, ${translateY}%) scale(${scale})`;
   });
-
-  function updateTransform() {
-    screen.style.transform = `translate(${translateX}%, ${translateY}%) scale(${scale})`;
-  }
 }
 
-// 実行！
-runValidation();
+// DOMの読み込み状態を自動判別して安全に起動
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", runValidation);
+} else {
+  runValidation();
+}

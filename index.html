@@ -6,21 +6,23 @@
   <link rel="manifest" href="/manifest.json">
   <title>Wasm Steam Deck Foundation</title>
   <style>
-    /* ➔ スマホで絶対にタップを逃さない＆最前面に持ってくるための緊急CSS */
     #debug-overlay {
       position: fixed !important;
       top: 10px !important;
       left: 10px !important;
       width: calc(100% - 20px) !important;
       max-width: 400px !important;
-      z-index: 99999 !important; /* 他のすべての要素の前に出す */
+      z-index: 99999 !important;
       background: rgba(15, 15, 15, 0.95) !important;
       border: 2px solid #333 !important;
       padding: 15px !important;
       box-sizing: border-box !important;
+      /* ➔ 下のレイヤーにタップを逃さない */
+      pointer-events: auto !important;
+      touch-action: auto !important;
     }
     button {
-      padding: 12px 15px !important; /* ボタンを大きくして押しやすく */
+      padding: 12px 15px !important;
       font-size: 14px !important;
       margin: 5px !important;
       cursor: pointer !important;
@@ -28,6 +30,9 @@
       color: #fff !important;
       border: 1px solid #555 !important;
       border-radius: 6px !important;
+      /* ➔ ボタン単体でもタッチを確実に奪取 */
+      pointer-events: auto !important;
+      touch-action: manipulation !important;
     }
     button:active {
       background: #555 !important;

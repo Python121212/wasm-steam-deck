@@ -1,10 +1,18 @@
-async function fetchRangeChunk(url: string, start: number, end: number): Promise<Uint8Array> {
+// サーバーから特定のバイト範囲を取得（206に対応してなくても200の全取得から切り出す超高耐久仕様）
+async function fetchRangeChunk(url: string, start: number, len: number): Promise<Uint8Array> {
+  const end = start + len - 1;
   const response = await fetch(url, {
     headers: { 'Range': `bytes=${start}-${end}` }
   });
 
+  // ➔ 万が一サーバーがRange(206)を無視して丸ごと(200)返してきたら、フロント側でちぎる
+  if (response.status === 200) {
+    const fullBuffer = await response.arrayBuffer();
+    return new Uint8Array(fullBuffer).subarray(0, len);
+  }
+
   if (response.status !== 206) {
-    throw new Error(`Rangeエラー: ${response.status}`);
+    throw new Error(`HTTPエラー: ${response.status}`);
   }
 
   const arrayBuffer = await response.arrayBuffer();
@@ -19,7 +27,6 @@ export async function streamToOPFS(url: string, targetOffset: number, chunkSize:
     const chunkData = await fetchRangeChunk(url, targetOffset, chunkSize);
     const writable = await fileHandle.createWritable();
     
-    // 💡【重要】@ts-ignore をつけて、TypeScriptの型エラーを強制的に黙らせます
     // @ts-ignore
     await writable.write({
       type: 'write',
@@ -28,10 +35,10 @@ export async function streamToOPFS(url: string, targetOffset: number, chunkSize:
     });
     
     await writable.close();
-    return `成功: ${targetOffset}バイト目〜 同期完了！`;
+    return `成功: ${targetOffset}B目に${chunkData.length}B書き込み！`;
   } catch (e: any) {
-    console.error("Streaming Error:", e);
-    return `失敗: ${e.message}`;
+    console.error(e);
+    return `失敗: ${e.message || e}`;
   }
 }
 

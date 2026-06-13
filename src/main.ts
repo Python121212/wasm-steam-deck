@@ -2,7 +2,8 @@ import './style.css';
 import { testOPFS } from './opfs';
 import { initGamepad } from './input';
 
-document.addEventListener("DOMContentLoaded", async () => {
+// 起動時に即実行する関数
+async function runValidation() {
   const sabEl = document.getElementById("status-sab")!;
   const opfsEl = document.getElementById("status-opfs")!;
   const gamepadEl = document.getElementById("status-gamepad")!;
@@ -13,7 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     sabEl.textContent = "有効（Wasmマルチスレッド解放！）";
     sabEl.className = "ok";
   } else {
-    sabEl.textContent = "無効（vercel.jsonの設定、またはHTTPS接続が必要です）";
+    sabEl.textContent = "無効（HTTPS接続、またはvercel.jsonの確認が必要です）";
     sabEl.className = "ng";
   }
 
@@ -40,10 +41,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   let isDragging = false;
 
   window.addEventListener("wheel", (e) => {
-    // マウスのホイール（またはスマホのピンチ）で画面をGPU拡大縮小
     e.preventDefault();
     scale += e.deltaY * -0.001;
-    scale = Math.min(Math.max(0.5, scale), 3); // 0.5倍〜3倍に制限
+    scale = Math.min(Math.max(0.5, scale), 3);
     updateTransform();
   }, { passive: false });
 
@@ -51,7 +51,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   window.addEventListener("mouseup", () => isDragging = false);
   window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
-    // 画面を掴んでドラッグ移動（相対座標移動テスト）
     translateX += (e.movementX / window.innerWidth) * 100;
     translateY += (e.movementY / window.innerHeight) * 100;
     updateTransform();
@@ -60,5 +59,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   function updateTransform() {
     screen.style.transform = `translate(${translateX}%, ${translateY}%) scale(${scale})`;
   }
-});
+}
 
+// 実行！
+runValidation();

@@ -3,9 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": {
+    "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "node generate-dummy.js && tsc && vite build",
     "preview": "vite preview"
   },
   "devDependencies": {

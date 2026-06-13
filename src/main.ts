@@ -2,10 +2,10 @@ import './style.css';
 import { testOPFS, streamToOPFS, getVirtualFileSize } from './opfs';
 import { initGamepad } from './input';
 
-// 🔥 キャッシュ看破：最新のJSが動いた瞬間、タイトルの横に緑色で [v3-Live] と刻まれます
+// キャッシュ看破：最新のJSが動いた瞬間、タイトルの横に緑色で [v3-Live] と刻まれます
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#00ffcc; font-weight:bold;">[v3-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#00ffcc; font-weight:bold;">[v4-Live]</span>';
 }
 
 async function runValidation() {
@@ -36,8 +36,8 @@ async function runValidation() {
   };
   await updateDiskSizeDisplay();
 
-  // 🎯 100%絶対に存在する「今のページ自体」をダミーデータとしてストリーム実験！
-  const targetUrl = window.location.href;
+  // 🎯 修正：100%絶対にRange requestsが通る、固定データファイルをターゲットにします！
+  const targetUrl = "/dummy_game.bin";
 
   // 最も確実にクリックを奪取するインライン上書き方式
   (btnHead as HTMLButtonElement).onclick = async () => {

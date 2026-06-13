@@ -1,1 +1,41 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+body, html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: #1a1a1a;
+  font-family: sans-serif;
+}
+#deck-screen {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 800px;  /* 将来の仮想解像度（仮） */
+  height: 600px;
+  background: #000;
+  transform: translate(-50%, -50%) scale(1);
+  transform-origin: center center;
+  cursor: crosshair;
+  transition: transform 0.05s linear;
+}
+#debug-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+  padding: 15px;
+  border-radius: 8px;
+  font-size: 13px;
+  pointer-events: none; /* 下のCanvasのタッチを邪魔しない */
+  line-height: 1.6;
+  border: 1px solid #333;
+}
+.ok { color: #00ff88; font-weight: bold; }
+.ng { color: #ff3366; font-weight: bold; }
 

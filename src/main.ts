@@ -2,10 +2,24 @@ import './style.css';
 import { testOPFS, streamToOPFS, getVirtualFileSize } from './opfs';
 import { initGamepad } from './input';
 
-// キャッシュ看破：最新のJSが動いた瞬間、タイトルの横に緑色で [v3-Live] と刻まれます
+// 🚨 【超重要】裏で起きた非同期エラー（Fetch失敗やOPFSエラー）を絶対に逃さず画面に出す設定
+window.addEventListener('unhandledrejection', (event) => {
+  const logEl = document.getElementById("stream-log");
+  if (logEl) {
+    logEl.innerHTML = `<span style="color: #ff3366; font-weight:bold;">🚨 非同期エラー発生: ${event.reason?.message || event.reason}</span>`;
+  }
+});
+
+// 通常のエラーも継続監視
+window.addEventListener('error', (event) => {
+  const logEl = document.getElementById("stream-log");
+  if (logEl) logEl.innerHTML = `<span style="color: #ff3366;">🚨 エラー: ${event.message}</span>`;
+});
+
+// キャッシュ看破タグ [v5-Live]
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#00ffcc; font-weight:bold;">[v4-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#ff00ff; font-weight:bold;">[v5-Live]</span>';
 }
 
 async function runValidation() {
@@ -36,25 +50,25 @@ async function runValidation() {
   };
   await updateDiskSizeDisplay();
 
-  // 🎯 修正：100%絶対にRange requestsが通る、固定データファイルをターゲットにします！
+  // ターゲットURL
   const targetUrl = "/dummy_game.bin";
 
-  // 最も確実にクリックを奪取するインライン上書き方式
+  // ボタンが押されたら「即座に」文字を変えて、タップが成功したか視覚化する
   (btnHead as HTMLButtonElement).onclick = async () => {
-    streamLogEl.textContent = "⏳ 0MB目をフェッチ中...";
+    streamLogEl.textContent = "📱 タップ検知！0MBフェッチ開始...";
     streamLogEl.style.color = "#00ffcc";
+    
     const res = await streamToOPFS(targetUrl, 0, 1024);
     streamLogEl.textContent = res;
-    streamLogEl.style.color = res.includes("失敗") ? "#ff3366" : "#aaa";
     await updateDiskSizeDisplay();
   };
 
   (btnTail as HTMLButtonElement).onclick = async () => {
-    streamLogEl.textContent = "⏳ 10MB目をフェッチ中...";
+    streamLogEl.textContent = "📱 タップ検知！10MBフェッチ開始...";
     streamLogEl.style.color = "#00ffcc";
+    
     const res = await streamToOPFS(targetUrl, 10000000, 1024);
     streamLogEl.textContent = res;
-    streamLogEl.style.color = res.includes("失敗") ? "#ff3366" : "#aaa";
     await updateDiskSizeDisplay();
   };
 }

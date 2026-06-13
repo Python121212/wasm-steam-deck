@@ -5,6 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <link rel="manifest" href="/manifest.json">
   <title>Wasm Steam Deck Foundation</title>
+  <style>
+    /* ➔ スマホで絶対にタップを逃さない＆最前面に持ってくるための緊急CSS */
+    #debug-overlay {
+      position: fixed !important;
+      top: 10px !important;
+      left: 10px !important;
+      width: calc(100% - 20px) !important;
+      max-width: 400px !important;
+      z-index: 99999 !important; /* 他のすべての要素の前に出す */
+      background: rgba(15, 15, 15, 0.95) !important;
+      border: 2px solid #333 !important;
+      padding: 15px !important;
+      box-sizing: border-box !important;
+    }
+    button {
+      padding: 12px 15px !important; /* ボタンを大きくして押しやすく */
+      font-size: 14px !important;
+      margin: 5px !important;
+      cursor: pointer !important;
+      background: #333 !important;
+      color: #fff !important;
+      border: 1px solid #555 !important;
+      border-radius: 6px !important;
+    }
+    button:active {
+      background: #555 !important;
+    }
+  </style>
 </head>
 <body>
   <canvas id="deck-screen"></canvas>
@@ -18,13 +46,14 @@
     
     <hr style="margin: 10px 0; border-color: #444;">
     <h3>🌐 HTTP Range / スパースI/O 実験</h3>
-    <div style="margin-top: 8px;">
-      <button id="btn-fetch-head" style="padding: 5px 8px; margin-right: 5px; cursor: pointer;">① 0MB目を1KB取得</button>
-      <button id="btn-fetch-tail" style="padding: 5px 8px; cursor: pointer;">② 10MB目を1KB取得</button>
+    <div style="margin-top: 8px; display: flex; flex-wrap: wrap;">
+      <button id="btn-fetch-head">① 0MB目を1KB取得</button>
+      <button id="btn-fetch-tail">② 10MB目を1KB取得</button>
     </div>
     <div style="margin-top: 8px;">📊 仮想ディスクの物理サイズ: <span id="disk-size" style="color: #ffaa00; font-weight: bold;">0</span> 内部バイト</div>
-    <div id="stream-log" style="font-size: 11px; color: #aaa; margin-top: 5px; background: #000; padding: 5px; border-radius: 4px; max-height: 60px; overflow-y: auto;">ログを待機中...</div>
+    <div id="stream-log" style="font-size: 13px; color: #aaa; margin-top: 8px; background: #000; padding: 8px; border-radius: 4px; min-height: 40px; word-break: break-all;">ログを待機中...</div>
   </div>
 
   <script type="module" src="./src/main.ts"></script>
 </body>
+</html>

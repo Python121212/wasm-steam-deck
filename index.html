@@ -1,1 +1,22 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link rel="manifest" href="/manifest.json">
+  <title>Wasm Steam Deck Foundation</title>
+</head>
+<body>
+  <canvas id="deck-screen"></canvas>
+
+  <div id="debug-overlay">
+    <h2>🎮 Wasm Deck OS Status</h2>
+    <hr>
+    <div>🔒 クロスオリジン隔離 (SharedArrayBuffer): <span id="status-sab">検査中...</span></div>
+    <div>💾 OPFS (超高速ストレージ I/O): <span id="status-opfs">検査中...</span></div>
+    <div>🕹️ コントローラー (Gamepad API): <span id="status-gamepad">未接続</span></div>
+    <p style="font-size: 11px; color: #888;">画面をドラッグで相対マウス移動 / ピンチ（スクロール）でGPUズームテスト</p>
+  </div>
+</body>
+</html>
 

@@ -17,10 +17,10 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v7-Live]（青緑）
+// キャッシュ看破タグ [v8-Live]（緑）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#00ffff; font-weight:bold;">[v7-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#00ff00; font-weight:bold;">[v8-Live]</span>';
 }
 
 function runValidation() {

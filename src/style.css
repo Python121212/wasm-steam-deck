@@ -1,41 +1,55 @@
-* {
-  box-sizing: border-box;
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: dark;
+  background-color: #050505;
+}
+
+body {
   margin: 0;
   padding: 0;
-  user-select: none;
-}
-body, html {
-  width: 100%;
-  height: 100%;
   overflow: hidden;
-  background-color: #1a1a1a;
-  font-family: sans-serif;
+  width: 100vw;
+  height: 100vh;
+  background: #000;
 }
+
+/* 📺 ゲーム画面用Canvas：背景いっぱいにアスペクト比を維持して広げる */
 #deck-screen {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 800px;  /* 将来の仮想解像度（仮） */
-  height: 600px;
-  background: #000;
-  transform: translate(-50%, -50%) scale(1);
-  transform-origin: center center;
-  cursor: crosshair;
-  transition: transform 0.05s linear;
+  transform: translate(-50%, -50%);
+  width: 100vw;
+  height: 62.5vw; /* 16:10 ratio */
+  max-width: 160vh;
+  max-height: 100vh;
+  object-fit: contain;
+  image-rendering: pixelated; /* ドット絵をクッキリ映す魔法 */
+  z-index: 1;
 }
-#debug-overlay {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  background: rgba(0, 0, 0, 0.85);
-  color: #fff;
-  padding: 15px;
-  border-radius: 8px;
-  font-size: 13px;
-  pointer-events: none; /* 下のCanvasのタッチを邪魔しない */
-  line-height: 1.6;
-  border: 1px solid #333;
-}
-.ok { color: #00ff88; font-weight: bold; }
-.ng { color: #ff3366; font-weight: bold; }
 
+/* デバッグ用オーバーレイを前面に配置 */
+#debug-overlay {
+  font-family: monospace;
+  font-size: 13px;
+  color: #e0e0e0;
+  line-height: 1.6;
+}
+
+#debug-overlay h2 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  color: #fff;
+}
+
+.ok {
+  color: #00ff66;
+  font-weight: bold;
+}
+
+.ng {
+  color: #ff3366;
+  font-weight: bold;
+}

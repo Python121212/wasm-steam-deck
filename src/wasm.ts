@@ -1,148 +1,228 @@
 export class VirtualWasmCore {
-  // 🚀 本物のWebAssembly線形メモリ（Linear Memory）オブジェクト
   public wasmMemory: WebAssembly.Memory;
-  
-  // Wasmメモリの内部バッファを直接覗き込んで操作するための高速配列ビュー
   public vram: Uint8ClampedArray;
-  
   private width: number;
   private height: number;
 
-  // 🗺️ メモリマップ（アドレス配置）
-  private readonly VRAM_OFFSET = 0;
-  private readonly STATE_OFFSET = 400000; // 400,000番地から変数空間
-  private readonly UART_BUF_OFFSET = 410000; // 410,000番地から仮想UARTシリアルバッファ空間
+  // 🗺️ 仮想RISC-Vシステム メモリマップ
+  private readonly VRAM_OFFSET = 0;       // 0x00000000 〜 : VRAM領域 (400x250x4 = 400,000バイト)
+  private readonly STATE_OFFSET = 400000;  // 0x00061A80 〜 : CPU内部状態保存・通信用レジスタ
+  private readonly UART_BUF_OFFSET = 410000;// 0x00064190 〜 : 仮想UARTシリアルバッファ
 
-  // レジスタ・変数オフセット（STATE_OFFSETからのバイト相対位置）
-  private readonly REG_PX = 0;    // プレイヤーX座標 (float32)
-  private readonly REG_PY = 4;    // プレイヤーY座標 (float32)
-  private readonly REG_FC = 8;    // フレームカウンター (uint32)
-  private readonly REG_PC = 12;   // 🚀 [新設] 仮想CPU プログラムカウンタ (uint32)
-  private readonly REG_UART_LEN = 16; // 仮想UARTに書き込まれた文字数 (uint32)
+  // 💾 JavaScript同期用の内部変数の相対オフセット
+  private readonly REG_JS_PC       = 0;
+  private readonly REG_JS_UART_LEN = 4;
+  private readonly REG_JS_LAST_MNEM = 8; // 現在実行した命令の簡易ハッシュ
+
+  // 🛠️ 仮想RISC-V CPU内部リソース
+  private pc: number = 0x80000000;         // プログラムカウンタ（Linuxの標準ブート開始アドレス）
+  private registers = new Int32Array(32);  // X0 〜 X31 の32個の本物の汎用レジスタ
+  private lastMnemonic: string = "NOP";
+  private uartWritePtr: number = 0;        // UARTバッファの書き込みカレント位置
 
   constructor(width: number, height: number) {
     this.width = width;
     this.height = height;
 
-    // WebAssemblyメモリを初期サイズ8ページ（512KB）確保
-    this.wasmMemory = new WebAssembly.Memory({ initial: 8 });
+    this.wasmMemory = new WebAssembly.Memory({ initial: 8 }); // 512KB確保
+    this.vram = new Uint8ClampedArray(this.wasmMemory.buffer, this.VRAM_OFFSET, width * height * 4);
 
-    // Canvas描画用のVRAM領域（400KB分）をダイレクトに切り出し
-    this.vram = new Uint8ClampedArray(
-      this.wasmMemory.buffer,
-      this.VRAM_OFFSET,
-      width * height * 4
-    );
+    // X0レジスタはハードウェア的に「常にゼロ」
+    this.registers[0] = 0;
 
-    // 💾 Wasmの初期レジスタ値をDataViewで直接書き込み
-    const view = new DataView(this.wasmMemory.buffer);
-    view.setFloat32(this.STATE_OFFSET + this.REG_PX, 200, true);  
-    view.setFloat32(this.STATE_OFFSET + this.REG_PY, 125, true);  
-    view.setUint32(this.STATE_OFFSET + this.REG_FC, 0, true);     
-    // 💡 0x80000000 は、本物のLinuxカーネル（RISC-V等）がメモリ上に展開される一般的な開始アドレスです
-    view.setUint32(this.STATE_OFFSET + this.REG_PC, 0x80000000, true);  
-    view.setUint32(this.STATE_OFFSET + this.REG_UART_LEN, 0, true); 
-  }
+    // 💿 【本物のRISC-Vバイナリ・ブートROM】
+    // Linuxカーネルが最初に行う「メモリから文字列をロードし、UART(MMIO)へ出力してループする」アセンブリを機械語(16進数)にしたもの
+    const bootRom = new Uint32Array([
+      0x800000b7, // 1) LUI x1, 0x80000    -> X1レジスタに文字列のベースアドレスをセット
+      0x0c008093, // 2) ADDI x1, x1, 192   -> X1 = 0x800000C0 (文字列の格納アドレスへ)
+      0x40001137, // 3) LUI x2, 0x40001    -> X2 = 0x40001000 (仮想UARTポートのMMIOアドレス)
+      0x00008183, // 4) LB x3, 0(x1)       -> [Fetch] 文字列アドレス(X1)から1バイトをX3にロード
+      0x00018863, // 5) BEQ x3, x0, 16     -> [Decode] もしX3(文字)が0なら、4個先の「end:」へジャンプ
+      0x00310023, // 6) SB x3, 0(x2)       -> [Execute] UARTアドレス(X2)に文字(X3)を1バイトストア！(MMIO発火)
+      0x00108093, // 7) ADDI x1, x1, 1     -> 文字列ポインタを+1進める
+      0xff1ff06f, // 8) JAL x0, -16        -> 4)の「LB命令」の位置へジャンプしてループ
+      0x0000006f  // 9) end: JAL x0, 0     -> OSブート完了後の無限ホールド
+    ]);
 
-  // 🎮 毎フレーム、統合インプットをメモリに受け取って仮想CPUロジックを回す
-  public tick(gamepadState: { buttons: string[], axes: number[] }) {
-    const view = new DataView(this.wasmMemory.buffer);
+    // 📜 本物のLinuxカーネルの起動ログを完全に模した「ブート文字列バイナリ」
+    const bootString = 
+      "\n" +
+      "[    0.000000] Linux version 6.6.0-riscv32-deck (gcc 13.2.0) #1 SMP Sun Jun 14 2026\n" +
+      "[    0.000000] CPU0: Found RISC-V Virtual-Core (ISA: RV32I-v20)\n" +
+      "[    0.000000] Memory: 512KB total capacity [VRAM 400KB / KERNEL 112KB]\n" +
+      "[    0.001245] Serial: 16550A MMIO UART driver initialized at 0x40001000\n" +
+      "[    0.015682] Calibrating delay loop... 1420.12 BogoMIPS (lpj=710060)\n" +
+      "[    0.038921] VFS: Loaded root filesystem from OPFS virtual SSD storage\n" +
+      "[    0.051047] devtmpfs: initialized\n" +
+      "[    0.089241] Freeing unused kernel image memory... 48K\n" +
+      "\n" +
+      "🐧 Welcome to WebSteamDeck GNU/Linux v20!\n" +
+      "deck-login: root (automatic login)\n" +
+      "root@deck:/# _";
 
-    // メモリから現在の変数をロード
-    let playerX = view.getFloat32(this.STATE_OFFSET + this.REG_PX, true);
-    let playerY = view.getFloat32(this.STATE_OFFSET + this.REG_PY, true);
-    let frameCount = view.getUint32(this.STATE_OFFSET + this.REG_FC, true);
-    let virtualPC = view.getUint32(this.STATE_OFFSET + this.REG_PC, true);
-
-    frameCount++;
-    view.setUint32(this.STATE_OFFSET + this.REG_FC, frameCount, true);
-
-    // ⚡【CPUエミュレーション】命令を読み進めるように、PCを4バイトずつ擬似インクリメント
-    virtualPC += 4;
-    if (virtualPC > 0x80001000) {
-      virtualPC = 0x80000000; // 一定領域を超えたらブート直後にループバック
-    }
-    view.setUint32(this.STATE_OFFSET + this.REG_PC, virtualPC, true);
-
-    let dx = 0;
-    let dy = 0;
-
-    if (gamepadState.axes.length >= 2) {
-      if (Math.abs(gamepadState.axes[0]) > 0.15) dx = gamepadState.axes[0] * 4;
-      if (Math.abs(gamepadState.axes[1]) > 0.15) dy = gamepadState.axes[1] * 4;
-    }
-
-    if (gamepadState.buttons.includes("A")) {
-      dx *= 2;
-      dy *= 2;
-    }
-
-    playerX = Math.max(10, Math.min(this.width - 10, playerX + dx));
-    playerY = Math.max(10, Math.min(this.height - 10, playerY + dy));
-
-    // 計算結果をWasm変数アドレスへ再ストア
-    view.setFloat32(this.STATE_OFFSET + this.REG_PX, playerX, true);
-    view.setFloat32(this.STATE_OFFSET + this.REG_PY, playerY, true);
-
-    // 📟 【仮想UART通信処理】蛍光灯データを完全排除し、純粋なCPUステータスをストリーム出力！
-    const uartString = `[UART_TX] PC:0x${virtualPC.toString(16).toUpperCase()}  X:${playerX.toFixed(1)}  Y:${playerY.toFixed(1)}  FRAME:${frameCount}`;
+    // Wasmメモリの 0x80000000番地（実際は適当な空きバッファの後方を利用）にプログラムと文字列をデプロイ
+    const u32Memory = new Uint32Array(this.wasmMemory.buffer);
     const u8Memory = new Uint8Array(this.wasmMemory.buffer);
-    
-    for (let i = 0; i < uartString.length; i++) {
-      u8Memory[this.UART_BUF_OFFSET + i] = uartString.charCodeAt(i);
-    }
-    // レジスタに現在の有効文字数をストアして、外部（JavaScript）へ送信完了を通知
-    view.setUint32(this.STATE_OFFSET + this.REG_UART_LEN, uartString.length, true);
 
-    // VRAM描画実行（背景と自機のみのクリアな画面へ）
-    this.render(playerX, playerY, gamepadState.buttons.includes("A"), frameCount);
+    // 仮想カーネル空間のベースインデックス（450,000番地を 0x80000000 と見立ててマッピング）
+    const KERNEL_BASE = 450000;
+    
+    // 1. 機械語プログラムをロード
+    for (let i = 0; i < bootRom.length; i++) {
+      u32Memory[(KERNEL_BASE + i * 4) / 4] = bootRom[i];
+    }
+    // 2. カーネル文字列を 0x800000C0 (KERNEL_BASE + 192バイト) にロード
+    for (let i = 0; i < bootString.length; i++) {
+      u8Memory[KERNEL_BASE + 192 + i] = bootString.charCodeAt(i);
+    }
+    u8Memory[KERNEL_BASE + 192 + bootString.length] = 0; // 終端ヌル文字
   }
 
-  // 📡 現在のメモリ上のテレメトリ値を生データで引っこ抜くヘルパー
-  public getTelemetryData() {
+  // 🎮 毎フレーム、JavaScriptから叩かれるクロック駆動。ここで15命令を一気に高速エミュレート！
+  public tick(gamepadState: { buttons: string[], axes: number[] }) {
+    const KERNEL_BASE = 450000;
+    const u32Memory = new Uint32Array(this.wasmMemory.buffer);
+    const u8Memory = new Uint8Array(this.wasmMemory.buffer);
+
+    // 🏎️ 1フレームの間に15命令を実行する「クロックブースト」
+    for (let clock = 0; clock < 15; clock++) {
+      // メモリ上の仮想アドレス 0x80000000 帯をローカルインデックスに変換
+      const localAddr = KERNEL_BASE + (this.pc - 0x80000000);
+      
+      // 1. 【FETCH (命令要求)】メモリから32bitのマシンコードを1つ抽出
+      const instr = u32Memory[localAddr / 4];
+
+      // 2. 【DECODE (命令解読)】RISC-V規格に則り、ビットマスクで各要素に分解
+      const opcode = instr & 0x7f;
+      const rd = (instr >> 7) & 0x1f;
+      const funct3 = (instr >> 12) & 0x07;
+      const rs1 = (instr >> 15) & 0x1f;
+      const rs2 = (instr >> 20) & 0x1f;
+
+      // 即値（Immediate）のデコード
+      let imm = 0;
+      if (opcode === 0x13 || opcode === 0x03) { // I-type (ADDI, LB)
+        imm = instr >> 20; 
+      } else if (opcode === 0x37) { // U-type (LUI)
+        imm = instr & 0xfffff000;
+      } else if (opcode === 0x23) { // S-type (SB)
+        imm = (((instr >> 25) & 0x7f) << 5) | ((instr >> 7) & 0x1f);
+        if (imm & 0x800) imm |= 0xfffff000; // 符号拡張
+      } else if (opcode === 0x63) { // B-type (BEQ)
+        imm = (((instr >> 31) & 1) << 12) | (((instr >> 7) & 1) << 11) | (((instr >> 25) & 0x3f) << 5) | (((instr >> 8) & 0x0f) << 1);
+        if (imm & 0x1000) imm |= 0xffffe000;
+      } else if (opcode === 0x6f) { // J-type (JAL)
+        imm = (((instr >> 31) & 1) << 20) | (((instr >> 12) & 0xff) << 12) | (((instr >> 20) & 1) << 11) | (((instr >> 21) & 0x3ff) << 1);
+        if (imm & 0x100000) imm |= 0xffe00000;
+      }
+
+      // 3. 【EXECUTE (命令実行)】
+      let nextPc = this.pc + 4; // 基本は4バイト進む
+
+      switch (opcode) {
+        case 0x37: // LUI (Load Upper Immediate)
+          this.registers[rd] = imm;
+          this.lastMnemonic = `LUI x${rd}, 0x${(imm >>> 12).toString(16).toUpperCase()}`;
+          break;
+
+        case 0x13: // ADDI (Add Immediate)
+          this.registers[rd] = this.registers[rs1] + imm;
+          this.lastMnemonic = `ADDI x${rd}, x${rs1}, ${imm}`;
+          break;
+
+        case 0x03: // LB (Load Byte)
+          const loadTarget = this.registers[rs1] + imm;
+          const loadIdx = KERNEL_BASE + (loadTarget - 0x80000000);
+          // 符号拡張してロード
+          this.registers[rd] = (u8Memory[loadIdx] << 24) >> 24;
+          this.lastMnemonic = `LB x${rd}, ${imm}(x${rs1})`;
+          break;
+
+        case 0x23: // SB (Store Byte) ── 📟 【MMIOシステム発火！】
+          const storeTarget = this.registers[rs1] + imm;
+          const byteVal = this.registers[rs2] & 0xff;
+
+          // もしOSが、シリアルポートレジスタ（0x40001000）に向けて書き込みを行ったら
+          if (storeTarget === 0x40001000) {
+            // 仮想UARTバッファ（メモリ）へ自動的に文字を追記
+            u8Memory[this.UART_BUF_OFFSET + this.uartWritePtr] = byteVal;
+            this.uartWritePtr++;
+          }
+          this.lastMnemonic = `SB x${rs2}, ${imm}(x${rs1})`;
+          break;
+
+        case 0x63: // BEQ (Branch Equal)
+          if (this.registers[rs1] === this.registers[rs2]) {
+            nextPc = this.pc + imm;
+          }
+          this.lastMnemonic = `BEQ x${rs1}, x${rs2}, ${imm}`;
+          break;
+
+        case 0x6f: // JAL (Jump and Link)
+          if (rd !== 0) this.registers[rd] = this.pc + 4;
+          nextPc = this.pc + imm;
+          this.lastMnemonic = `JAL x${rd}, ${imm}`;
+          break;
+
+        default:
+          this.lastMnemonic = `UNKNOWN (0x${opcode.toString(16)})`;
+          break;
+      }
+
+      this.registers[0] = 0; // X0は常に0固定をハードウェア保証
+      this.pc = nextPc;
+    }
+
+    // JavaScript同期用のレジスタをWasmメモリへフラッシュ
     const view = new DataView(this.wasmMemory.buffer);
+    view.setUint32(this.STATE_OFFSET + this.REG_JS_PC, this.pc, true);
+    view.setUint32(this.STATE_OFFSET + this.REG_JS_UART_LEN, this.uartWritePtr, true);
+
+    // 画面(Canvas)には、OSが稼働している象徴としてサイバーなマトリクス模様を薄くレンダリング
+    this.render(frameCount = view.getUint32(this.STATE_OFFSET + 8, true));
+    view.setUint32(this.STATE_OFFSET + 8, frameCount + 1, true);
+  }
+
+  // 📡 現在のCPUの完全なレジスタ状態をJavaScript側へ引き渡す
+  public getTelemetryData() {
     return {
-      x: view.getFloat32(this.STATE_OFFSET + this.REG_PX, true),
-      y: view.getFloat32(this.STATE_OFFSET + this.REG_PY, true),
-      pc: view.getUint32(this.STATE_OFFSET + this.REG_PC, true)
+      pc: this.pc,
+      mnemonic: this.lastMnemonic,
+      x1: this.registers[1],
+      x2: this.registers[2],
+      x3: this.registers[3],
+      allRegs: Array.from(this.registers)
     };
   }
 
-  // 📟 JavaScript(QEMU側)がWasmの生メモリ空間から直接シリアル文字列を吸い出すメソッド
+  // 📟 仮想UARTポートからデコードされたログを読み出す
   public readVirtualUart(): string {
-    const view = new DataView(this.wasmMemory.buffer);
-    const len = view.getUint32(this.STATE_OFFSET + this.REG_UART_LEN, true);
-    if (len === 0) return "";
-
-    const u8Memory = new Uint8Array(this.wasmMemory.buffer, this.UART_BUF_OFFSET, len);
+    if (this.uartWritePtr === 0) return "";
+    const u8Memory = new Uint8Array(this.wasmMemory.buffer, this.UART_BUF_OFFSET, this.uartWritePtr);
     return new TextDecoder("utf-8").decode(u8Memory);
   }
 
-  public injectPlayerPosition(x: number, y: number) {
-    const view = new DataView(this.wasmMemory.buffer);
-    view.setFloat32(this.STATE_OFFSET + this.REG_PX, x, true);
-    view.setFloat32(this.STATE_OFFSET + this.REG_PY, y, true);
+  // 📂 ステートロード（永続化ファイルからCPUの状態を完全復元）
+  public injectCpuState(pc: number, regs: number[]) {
+    this.pc = pc;
+    for (let i = 0; i < 32; i++) {
+      this.registers[i] = regs[i] || 0;
+    }
+    this.registers[0] = 0;
   }
 
-  private render(pX: number, pY: number, isPressed: boolean, frame: number) {
+  private render(frame: number) {
+    // OSブート画面らしいマトリクス・スキャンライン背景
     for (let y = 0; y < this.height; y++) {
       for (let x = 0; x < this.width; x++) {
         const idx = (y * this.width + x) * 4;
+        const scanline = Math.sin((y + frame * 2) * 0.15) * 4;
+        const matrixMote = (Math.sin(x * 0.05) * Math.cos(y * 0.05) > 0.4) ? 15 : 0;
 
-        const isPlayer = Math.abs(x - pX) < 6 && Math.abs(y - pY) < 6;
-        const scanline = Math.sin((y + frame) * 0.1) * 3;
-
-        if (isPlayer) {
-          this.vram[idx]     = isPressed ? 0xff : 0x00; 
-          this.vram[idx + 1] = isPressed ? 0x00 : 0xff; 
-          this.vram[idx + 2] = 0xff; 
-        } else {
-          const isGrid = (x % 20 === 0 || y % 20 === 0);
-          this.vram[idx]     = isGrid ? 0x1e + scanline : 0x06;
-          this.vram[idx + 1] = isGrid ? 0x00 : 0x06;
-          this.vram[idx + 2] = isGrid ? 0x3a + scanline : 0x18;
-        }
-        this.vram[idx + 3] = 0xff; 
+        this.vram[idx]     = 0x02; // R
+        this.vram[idx + 1] = 0x1a + scanline + matrixMote; // G (サイバーグリーン)
+        this.vram[idx + 2] = 0x08; // B
+        this.vram[idx + 3] = 0xff;
       }
     }
   }

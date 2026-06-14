@@ -153,7 +153,7 @@ function runValidation() {
   if (typeof SharedArrayBuffer !== "undefined") {
     sabEl.textContent = "有効"; sabEl.className = "ok";
   } else {
-    sabEl.textContent = "無効"; sabEl.className = "ng";
+    sabEl.textContent = "無egu無効"; sabEl.className = "ng";
   }
 
   const gamepadEl = document.getElementById("status-gamepad")!;
@@ -175,6 +175,36 @@ function runValidation() {
       opfsEl.className = "ng";
     }
   }, 50);
+
+  // 🐧 🔥 【重要：新規追加】仮想UARTシリアルバッファログを画面下の黒いコンソール帯にリアルタイム反映するポーリングループ
+  const logTerminalEl = document.getElementById("stream-log");
+  if (logTerminalEl) {
+    // 読みやすさ向上のため、コンソールのスタイルを少しハッカーらしく調整
+    logTerminalEl.style.fontFamily = "'Courier New', Courier, monospace";
+    logTerminalEl.style.fontSize = "12px";
+    logTerminalEl.style.lineHeight = "1.4";
+    logTerminalEl.style.whiteSpace = "pre-wrap";
+    logTerminalEl.style.padding = "10px";
+    logTerminalEl.style.color = "#39ff14"; // サイバーグリーン
+    logTerminalEl.style.overflowY = "auto";
+    logTerminalEl.style.maxHeight = "100%";
+
+    const pollUartLog = () => {
+      const activeCore = getActiveWasmCore();
+      if (activeCore) {
+        const uartOutput = activeCore.readVirtualUart();
+        if (uartOutput) {
+          // Wasm側のシリアルポートから出力された文字列を、画面下の要素にそっくり代入
+          logTerminalEl.textContent = uartOutput;
+          // 常に最新のログが見えるように自動最下部スクロール
+          logTerminalEl.scrollTop = logTerminalEl.scrollHeight;
+        }
+      }
+      requestAnimationFrame(pollUartLog);
+    };
+    // ログ監視のループを開始
+    requestAnimationFrame(pollUartLog);
+  }
 }
 
 if (document.readyState === "loading") {

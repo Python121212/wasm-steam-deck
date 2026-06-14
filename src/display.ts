@@ -16,8 +16,10 @@ export function initDisplay(canvasId: string) {
   // 🚀 本尊：Wasmゲームコアのインスタンス化！
   const wasmCore = new VirtualWasmCore(WIDTH, HEIGHT);
   
-  // Canvas転送用のラッパーオブジェクト（Wasmのメモリ空間を直接ラップする）
-  const imageData = new ImageData(wasmCore.memory, WIDTH, HEIGHT);
+  // 🔥 【TypeScript型エラー対策】
+  // 最新のTS型定義による Uint8ClampedArray(ArrayBufferLike) と ImageDataArray の内部的な型不整合を回避するため、
+  // 明示的に `as any` キャストを通してビルドの門番を突破します。
+  const imageData = new ImageData(wasmCore.memory as any, WIDTH, HEIGHT);
 
   function renderLoop() {
     if (!ctx) return;

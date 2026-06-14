@@ -3,6 +3,39 @@ import { testOPFS, streamToOPFS, getVirtualFileSize } from './opfs';
 import { initGamepad } from './input';
 import { initDisplay, getActiveWasmCore } from './display';
 
+// 🚨 【最強の対策】もしHTML側に stream-log がなければ、画面下の黒い領域（canvas等）の直後に強制生成する
+function ensureTerminalElement(): HTMLElement {
+  let logEl = document.getElementById("stream-log");
+  if (!logEl) {
+    // 既存の黒いコンソールエリアになりそうな要素、もしくはcanvasを探す
+    const container = document.querySelector('.console-container') || document.body;
+    logEl = document.createElement("div");
+    logEl.id = "stream-log";
+    container.appendChild(logEl);
+  }
+  
+  // 確実に視覚化するための強制スタイル適用
+  logEl.style.display = "block";
+  logEl.style.position = "absolute";
+  logEl.style.left = "5px";
+  logEl.style.bottom = "5px";
+  logEl.style.width = "calc(100% - 10px)";
+  logEl.style.height = "240px"; // スクリーンショットの黒い帯の高さに合わせる
+  logEl.style.backgroundColor = "#000000";
+  logEl.style.color = "#39ff14"; // ネオンマトリックスグリーン
+  logEl.style.fontFamily = "'Courier New', Courier, monospace";
+  logEl.style.fontSize = "13px";
+  logEl.style.lineHeight = "1.5";
+  logEl.style.overflowY = "auto";
+  logEl.style.whiteSpace = "pre-wrap";
+  logEl.style.padding = "10px";
+  logEl.style.boxSizing = "border-box";
+  logEl.style.zIndex = "9999";
+  logEl.style.borderTop = "2px solid #222";
+  
+  return logEl;
+}
+
 const printLog = (msg: string, color = "#aaa") => {
   const logEl = document.getElementById("stream-log");
   if (logEl) {
@@ -24,13 +57,16 @@ if (title) {
 }
 
 function runValidation() {
+  // 画面コンテキストの初期化
   initDisplay("deck-screen");
+  
+  // ターミナル要素を確実に画面上に生成・確保する
+  const logTerminalEl = ensureTerminalElement();
 
   const btnHead = document.getElementById("btn-fetch-head");
   const btnTail = document.getElementById("btn-fetch-tail");
-  const streamLogEl = document.getElementById("stream-log");
   
-  if (!btnHead || !btnTail || !streamLogEl) return;
+  if (!btnHead || !btnTail) return;
 
   const targetUrl = "/api/dummy";
 
@@ -172,38 +208,25 @@ function runValidation() {
     }
   }, 50);
 
-  // 🐧 リアルタイム反映ポーリングループ（確定反映版）
-  const logTerminalEl = document.getElementById("stream-log");
-  if (logTerminalEl) {
-    logTerminalEl.style.fontFamily = "'Courier New', Courier, monospace";
-    logTerminalEl.style.fontSize = "13px";
-    logTerminalEl.style.lineHeight = "1.5";
-    logTerminalEl.style.whiteSpace = "pre-wrap";
-    logTerminalEl.style.padding = "12px";
-    logTerminalEl.style.color = "#39ff14"; 
-    logTerminalEl.style.overflowY = "auto";
-    logTerminalEl.style.backgroundColor = "#000";
-
-    const pollUartLog = () => {
-      const activeCore = getActiveWasmCore();
-      if (activeCore) {
-        // 🔥 【今回の最重要ポイント】
-        // もしすでにCPUが走りきって止まっていたら、強制的に1回PCを先頭(0x80000000)に戻して再実行させる
-        const telemetry = activeCore.getTelemetryData();
-        if (telemetry.pc === 0x80000020) {
-          activeCore.injectCpuState(0x80000000, new Array(32).fill(0));
-        }
-
-        const uartOutput = activeCore.readVirtualUart();
-        if (uartOutput) {
-          logTerminalEl.textContent = uartOutput;
-          logTerminalEl.scrollTop = logTerminalEl.scrollHeight;
-        }
+  // 🐧 仮想UARTリアルタイム描画ループ（絶対出現版）
+  const pollUartLog = () => {
+    const activeCore = getActiveWasmCore();
+    if (activeCore) {
+      // CPUが最後まで走りきって停止していたら、PCをブート開始位置へ自動リマウント
+      const telemetry = activeCore.getTelemetryData();
+      if (telemetry.pc === 0x80000020) {
+        activeCore.injectCpuState(0x80000000, new Array(32).fill(0));
       }
-      requestAnimationFrame(pollUartLog);
-    };
+
+      const uartOutput = activeCore.readVirtualUart();
+      if (uartOutput) {
+        logTerminalEl.textContent = uartOutput;
+        logTerminalEl.scrollTop = logTerminalEl.scrollHeight;
+      }
+    }
     requestAnimationFrame(pollUartLog);
-  }
+  };
+  requestAnimationFrame(pollUartLog);
 }
 
 if (document.readyState === "loading") {

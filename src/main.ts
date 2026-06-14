@@ -18,10 +18,10 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v19-Core]（輝くネオンゴールド）
+// キャッシュ看破タグ [v20-OSBoot]（鮮烈なネオンライムグリーン）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#ffcc00; font-weight:bold;">[v19-Core]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#39ff14; font-weight:bold;">[v20-OSBoot]</span>';
 }
 
 function runValidation() {
@@ -37,11 +37,11 @@ function runValidation() {
 
   const btnContainer = btnHead.parentElement;
   if (btnContainer) {
-    // 💾 【セーブボタン】純粋な座標とCPU状態の永続化
+    // 💾 【CPUステートセーブ】レジスタファイルとPCをOPFSへダンプ
     const btnSave = document.createElement("button");
     btnSave.id = "btn-save-telemetry";
-    btnSave.textContent = "💾 座標・CPU状態をOPFSに記録";
-    btnSave.style.background = "linear-gradient(135deg, #00ffcc, #0077ff)";
+    btnSave.textContent = "💾 CPUステートをOPFSにスナップショット保存";
+    btnSave.style.background = "linear-gradient(135deg, #39ff14, #00aa00)";
     btnSave.style.color = "#000";
     btnSave.style.border = "none";
     btnSave.style.padding = "6px 12px";
@@ -50,44 +50,45 @@ function runValidation() {
     btnSave.style.cursor = "pointer";
     btnSave.style.fontWeight = "bold";
     btnSave.style.fontSize = "11px";
-    btnSave.style.boxShadow = "0 0 10px rgba(0,255,204,0.5)";
+    btnSave.style.boxShadow = "0 0 10px rgba(57,255,20,0.5)";
     btnContainer.appendChild(btnSave);
     
     btnSave.addEventListener("pointerdown", async (e) => {
       e.stopPropagation(); e.preventDefault();
-      printLog("💾 OPFSへのシステムデータ書き込みを開始...", "#00ffcc");
+      printLog("💾 仮想RISC-V CPUのレジスタダンプをOPFSへ永続化中...", "#39ff14");
       try {
         const activeCore = getActiveWasmCore();
         if (!activeCore) throw new Error("WasmCoreが初期化されていません");
 
-        const telemetry = activeCore.getTelemetryData();
+        const cpu = activeCore.getTelemetryData();
         const root = await navigator.storage.getDirectory();
-        // ファイル名をコアテレメトリへ変更
-        const fileHandle = await root.getFileHandle("core_telemetry.txt", { create: true });
-        const writable = await fileHandle.createWritable({ keepExistingData: true });
-        const file = await fileHandle.getFile();
-        await writable.seek(file.size);
+        const fileHandle = await root.getFileHandle("cpu_state.json", { create: true });
+        const writable = await fileHandle.createWritable();
         
-        const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
-        const logLine = `[${timestamp}] X:${telemetry.x.toFixed(2)} Y:${telemetry.y.toFixed(2)} PC:0x${telemetry.pc.toString(16).toUpperCase()}\n`;
+        // PCと全32個のレジスタ配列をJSON構造として保存
+        const statePayload = {
+          pc: cpu.pc,
+          registers: cpu.allRegs,
+          timestamp: new Date().toISOString()
+        };
         
-        await writable.write(logLine);
+        await writable.write(JSON.stringify(statePayload));
         await writable.close();
         
-        printLog(`✅ OPFS書き込み成功! [${timestamp}] PC:0x${telemetry.pc.toString(16).toUpperCase()}`, "#39ff14");
+        printLog(`✅ ステートセーブ完了! PC: 0x${cpu.pc.toString(16).toUpperCase()} を保持しました。`, "#39ff14");
         
         const size = await getVirtualFileSize();
         const diskSizeEl = document.getElementById("disk-size");
         if (diskSizeEl) diskSizeEl.textContent = size.toLocaleString();
       } catch (err: any) {
-        printLog(`❌ 保存失敗: ${err.message || err}`, "#ff3366");
+        printLog(`❌ スナップショット保存失敗: ${err.message || err}`, "#ff3366");
       }
     }, { passive: false });
 
-    // 📂 【ロードボタン】タイムワープ復元
+    // 📂 【CPUステートロード】保存されたスナップショットからCPU状態をインジェクションして再開
     const btnLoad = document.createElement("button");
     btnLoad.id = "btn-load-telemetry";
-    btnLoad.textContent = "📂 OPFSからシステムデータをロードして復元";
+    btnLoad.textContent = "📂 OPFSからCPUステートを復元（コールドリブート）";
     btnLoad.style.background = "linear-gradient(135deg, #ffaa00, #ff5500)";
     btnLoad.style.color = "#fff";
     btnLoad.style.border = "none";
@@ -102,39 +103,27 @@ function runValidation() {
 
     btnLoad.addEventListener("pointerdown", async (e) => {
       e.stopPropagation(); e.preventDefault();
-      printLog("📂 OPFSのコアログを解析中...", "#ffaa00");
+      printLog("📂 OPFSからレジスタファイルを展開中...", "#ffaa00");
 
       try {
         const activeCore = getActiveWasmCore();
         if (!activeCore) throw new Error("WasmCoreが見つかりません");
 
         const root = await navigator.storage.getDirectory();
-        const fileHandle = await root.getFileHandle("core_telemetry.txt", { create: true });
+        const fileHandle = await root.getFileHandle("cpu_state.json", { create: true });
         const file = await fileHandle.getFile();
         const text = await file.text();
 
         if (!text.trim()) {
-          throw new Error("保存されたコアログデータが空です。先にセーブしてください！");
+          throw new Error("スナップショットファイルが空です。先にセーブを行ってください！");
         }
 
-        const lines = text.trim().split("\n");
-        const lastLine = lines[lines.length - 1];
+        const state = JSON.parse(text);
+        activeCore.injectCpuState(state.pc, state.registers);
 
-        const matchX = lastLine.match(/X:([\d.]+)/);
-        const matchY = lastLine.match(/Y:([\d.]+)/);
-
-        if (!matchX || !matchY) {
-          throw new Error("ログのデータ形式が不正です");
-        }
-
-        const savedX = parseFloat(matchX[1]);
-        const savedY = parseFloat(matchY[1]);
-
-        activeCore.injectPlayerPosition(savedX, savedY);
-
-        printLog(`⚡ コア復元成功! 過去の位置 (${savedX.toFixed(1)}, ${savedY.toFixed(1)}) をWasmメモリに注入しました。`, "#39ff14");
+        printLog(`⚡ ステートロード成功! 実行アドレス 0x${state.pc.toString(16).toUpperCase()} からCPUコアが復職しました。`, "#39ff14");
       } catch (err: any) {
-        printLog(`❌ ロード失敗: ${err.message || err}`, "#ff3366");
+        printLog(`❌ ステート復元失敗: ${err.message || err}`, "#ff3366");
       }
     }, { passive: false });
   }
@@ -160,7 +149,6 @@ function runValidation() {
   btnHead.addEventListener("pointerdown", (e) => executeFetch(e, 0), { passive: false });
   btnTail.addEventListener("pointerdown", (e) => executeFetch(e, 10000000), { passive: false });
 
-  // ステータスチェック系
   const sabEl = document.getElementById("status-sab")!;
   if (typeof SharedArrayBuffer !== "undefined") {
     sabEl.textContent = "有効"; sabEl.className = "ok";

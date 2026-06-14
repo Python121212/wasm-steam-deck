@@ -1,6 +1,7 @@
 import './style.css';
 import { testOPFS, streamToOPFS, getVirtualFileSize } from './opfs';
 import { initGamepad } from './input';
+import { initDisplay } from './display'; // 👈 追加
 
 const printLog = (msg: string, color = "#aaa") => {
   const logEl = document.getElementById("stream-log");
@@ -17,20 +18,22 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v9-Live]（ド派手な紫）
+// キャッシュ看破タグ [v11-Live]（ビビッドピンク）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#ff00ff; font-weight:bold;">[v9-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#ff007f; font-weight:bold;">[v11-Live]</span>';
 }
 
 function runValidation() {
+  // 📺 何はともあれ、画面描画エンジンを最優先で起動！
+  initDisplay("deck-screen");
+
   const btnHead = document.getElementById("btn-fetch-head");
   const btnTail = document.getElementById("btn-fetch-tail");
   const streamLogEl = document.getElementById("stream-log");
   
   if (!btnHead || !btnTail || !streamLogEl) return;
 
-  // 🎯 ターゲットURLを自作APIルートに変更！これでVercelの静的416バグを完全回避
   const targetUrl = "/api/dummy";
 
   const executeFetch = async (e: Event, offset: number) => {

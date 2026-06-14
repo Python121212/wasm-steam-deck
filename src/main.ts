@@ -18,10 +18,10 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v17-Live]（サイバーオレンジ）
+// キャッシュ看破タグ [v17-Fix]（燃えるネオンレッド）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#ffaa00; font-weight:bold;">[v17-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#ff3366; font-weight:bold;">[v17-Fix]</span>';
 }
 
 function runValidation() {
@@ -39,9 +39,7 @@ function runValidation() {
   // 📝 各種コントロールボタンのコンテナを取得
   const btnContainer = btnHead.parentElement;
   if (btnContainer) {
-    // ----------------------------------------------------
     // 💾 【セーブボタン】前回作成した記録用ネオンボタン
-    // ----------------------------------------------------
     const btnSave = document.createElement("button");
     btnSave.id = "btn-save-telemetry";
     btnSave.textContent = "💾 座標・蛍光灯距離をOPFSに記録";
@@ -87,9 +85,7 @@ function runValidation() {
       }
     }, { passive: false });
 
-    // ----------------------------------------------------
-    // 📂 【新設ロードボタン】「後で使う」を今ここで回収！
-    // ----------------------------------------------------
+    // 📂 【ロードボタン】タイムワープ復元
     const btnLoad = document.createElement("button");
     btnLoad.id = "btn-load-telemetry";
     btnLoad.textContent = "📂 OPFSから最新の記録をロードして復元";
@@ -113,7 +109,6 @@ function runValidation() {
         const activeCore = getActiveWasmCore();
         if (!activeCore) throw new Error("WasmCoreが見つかりません");
 
-        // 1. OPFSからログファイルを開いてテキストとして全読み込み
         const root = await navigator.storage.getDirectory();
         const fileHandle = await root.getFileHandle("light_telemetry.txt", { create: true });
         const file = await fileHandle.getFile();
@@ -123,11 +118,9 @@ function runValidation() {
           throw new Error("保存されたログデータがまだ空っぽです。先にセーブしてください！");
         }
 
-        // 2. 改行で区切って、一番最後の有効な行（最新のログ）を特定
         const lines = text.trim().split("\n");
         const lastLine = lines[lines.length - 1];
 
-        // 3. 正規表現を使って、文字列から「X」と「Y」の数値をぶっこ抜く
         const matchX = lastLine.match(/X:([\d.]+)/);
         const matchY = lastLine.match(/Y:([\d.]+)/);
 
@@ -138,7 +131,6 @@ function runValidation() {
         const savedX = parseFloat(matchX[1]);
         const savedY = parseFloat(matchY[1]);
 
-        // 4. 解析した過去の座標データを、Wasmの生メモリ空間へ直接注入！
         activeCore.injectPlayerPosition(savedX, savedY);
 
         printLog(`⚡ タイムワープ成功! 過去の位置 (${savedX.toFixed(1)}, ${savedY.toFixed(1)}) をWasmメモリに復元しました。`, "#39ff14");

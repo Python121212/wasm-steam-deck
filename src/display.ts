@@ -26,6 +26,9 @@ export function initDisplay(canvasId: string) {
 
   // 🌀 毎フレーム、バックバッファ（VRAM）を直接書き換えて画面に転送するループ
   function renderLoop() {
+    // 🔥 【重要】TypeScriptへの念押し。クロージャ内でのnull逸脱の可能性を完全に潰す
+    if (!ctx) return;
+
     frameCount++;
 
     // ピクセルデータを直接いじる（Wasmが裏で行う処理のシミュレーション）

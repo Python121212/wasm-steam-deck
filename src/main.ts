@@ -1,7 +1,7 @@
 import './style.css';
 import { testOPFS, streamToOPFS, getVirtualFileSize } from './opfs';
 import { initGamepad } from './input';
-import { initDisplay } from './display'; // 👈 追加
+import { initDisplay } from './display';
 
 const printLog = (msg: string, color = "#aaa") => {
   const logEl = document.getElementById("stream-log");
@@ -18,14 +18,14 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v11-Live]（ビビッドピンク）
+// キャッシュ看破タグ [v12-Live]（ネオングリーン）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#ff007f; font-weight:bold;">[v11-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#39ff14; font-weight:bold;">[v12-Live]</span>';
 }
 
 function runValidation() {
-  // 📺 何はともあれ、画面描画エンジンを最優先で起動！
+  // 📺 描画エンジン（仮想Wasmゲームコア内蔵）を最優先で起動！
   initDisplay("deck-screen");
 
   const btnHead = document.getElementById("btn-fetch-head");

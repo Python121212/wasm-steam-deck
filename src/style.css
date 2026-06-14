@@ -13,9 +13,13 @@ body {
   width: 100vw;
   height: 100vh;
   background: #000;
+  /* スマホでの不要な長押しメニューや選択を完全禁止 */
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
-/* 📺 ゲーム画面用Canvas：背景いっぱいにアスペクト比を維持して広げる */
+/* 📺 ゲーム画面用Canvas */
 #deck-screen {
   position: absolute;
   top: 50%;
@@ -26,11 +30,10 @@ body {
   max-width: 160vh;
   max-height: 100vh;
   object-fit: contain;
-  image-rendering: pixelated; /* ドット絵をクッキリ映す魔法 */
+  image-rendering: pixelated;
   z-index: 1;
 }
 
-/* デバッグ用オーバーレイを前面に配置 */
 #debug-overlay {
   font-family: monospace;
   font-size: 13px;
@@ -52,4 +55,70 @@ body {
 .ng {
   color: #ff3366;
   font-weight: bold;
+}
+
+/* 🕹️ 仮想コントローラーUIオーバーレイ */
+#virtual-controller {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 5;
+  pointer-events: none; /* 下の要素を邪魔しない */
+}
+
+/* 仮想スティックの土台（左下） */
+#v-stick-base {
+  position: absolute;
+  bottom: 30px;
+  left: 30px;
+  width: 110px;
+  height: 110px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  pointer-events: auto; /* タッチイベントを有効化 */
+  touch-action: none;
+}
+
+/* 仮想スティックの真ん中のつまみ */
+#v-stick-knob {
+  position: absolute;
+  top: 40px;
+  left: 40px;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  pointer-events: none;
+}
+
+/* 仮想Aボタン（右下） */
+#v-btn-a {
+  position: absolute;
+  bottom: 45px;
+  right: 45px;
+  width: 75px;
+  height: 75px;
+  background: rgba(57, 255, 20, 0.15);
+  border: 2px solid rgba(57, 255, 20, 0.5);
+  color: #39ff14;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+/* ボタンを押した時のエフェクト */
+#v-btn-a:active {
+  background: rgba(57, 255, 20, 0.5);
+  color: #fff;
+  transform: scale(0.95);
 }

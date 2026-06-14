@@ -45,17 +45,17 @@ export function initDisplay(canvasId: string) {
     canvas.parentElement.appendChild(telemetryOverlay);
   }
 
-  // 📟 【レイアウト改善】QEMU風シリアルモニターをCanvasの真下（外側）へ完全パージ！
+  // 📟 QEMU風シリアルモニター（Canvasの真下・画面被りなし）
   let serialTerminal = document.getElementById("serial-terminal");
   if (!serialTerminal && canvas.parentElement) {
     serialTerminal = document.createElement("div");
     serialTerminal.id = "serial-terminal";
     serialTerminal.style.position = "absolute";
-    serialTerminal.style.top = "260px"; // 👈 Canvas(250px)の下側に完全に押し出し、重なりを排除！
+    serialTerminal.style.top = "260px"; 
     serialTerminal.style.left = "0px";
     serialTerminal.style.right = "0px";
     serialTerminal.style.background = "rgba(5, 5, 10, 0.9)";
-    serialTerminal.style.color = "#bb88ff"; // シリアルネオンパープル
+    serialTerminal.style.color = "#bb88ff"; 
     serialTerminal.style.fontFamily = "'Courier New', monospace";
     serialTerminal.style.padding = "6px 12px";
     serialTerminal.style.fontSize = "10px";
@@ -67,7 +67,6 @@ export function initDisplay(canvasId: string) {
     serialTerminal.style.textOverflow = "ellipsis";
     serialTerminal.style.boxShadow = "0 4px 10px rgba(187, 136, 255, 0.2)";
     
-    // 親コンテナの下部に余裕を持たせる
     canvas.parentElement.style.marginBottom = "45px";
     canvas.parentElement.appendChild(serialTerminal);
   }
@@ -79,13 +78,13 @@ export function initDisplay(canvasId: string) {
     wasmCore.tick(currentGamepadState);
     ctx.putImageData(imageData, 0, 0);
 
-    // 1. HUDテレメトリ更新
+    // 1. HUDテレメトリ更新（蛍光灯を完全排除し、エミュレータとしてのPCアドレスを表示）
     const telemetry = wasmCore.getTelemetryData();
     if (telemetryOverlay) {
       telemetryOverlay.innerHTML = `
-        <span style="color: #ff007f; font-weight: bold;">📡 TELEMETRY CORE</span><br>
+        <span style="color: #ff007f; font-weight: bold;">📡 V-CPU TELEMETRY</span><br>
         MY COORD : (${telemetry.x.toFixed(1)}, ${telemetry.y.toFixed(1)})<br>
-        NEAREST LIGHT : ${telemetry.distance.toFixed(2)} px
+        V-CPU PC : 0x${telemetry.pc.toString(16).toUpperCase()}
       `;
     }
 
@@ -99,5 +98,5 @@ export function initDisplay(canvasId: string) {
   }
 
   requestAnimationFrame(renderLoop);
-  console.log("📺 画面被りを解消したQEMUシリアルバス・モニタリングシステムが再起動しました。");
+  console.log("📺 蛍光灯ロジックを完全排除した純粋なV-CPUバスレイヤーが始動しました。");
 }

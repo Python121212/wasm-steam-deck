@@ -11,6 +11,7 @@ export class VirtualWasmCore {
   // 🗺️ メモリマップ（アドレス配置）
   private readonly VRAM_OFFSET = 0;
   private readonly STATE_OFFSET = 400000; // 400,000番地から変数空間
+  private readonly UART_BUF_OFFSET = 410000; // 🚀 [新設] 410,000番地から仮想UARTシリアルバッファ空間
 
   // レジスタ・変数オフセット（STATE_OFFSETからのバイト相対位置）
   private readonly REG_PX = 0;    // プレイヤーX座標 (float32)
@@ -19,6 +20,7 @@ export class VirtualWasmCore {
   private readonly REG_LX = 12;   // 蛍光灯の配置X座標 (float32)
   private readonly REG_LY = 16;   // 蛍光灯の配置Y座標 (float32)
   private readonly REG_DIST = 20; // 最寄りの蛍光灯への最短距離 (float32)
+  private readonly REG_UART_LEN = 24; // 🚀 [新設] 仮想UARTに書き込まれた文字数 (uint32)
 
   constructor(width: number, height: number) {
     this.width = width;
@@ -36,12 +38,13 @@ export class VirtualWasmCore {
 
     // 💾 Wasmの初期レジスタ値をDataViewで直接書き込み
     const view = new DataView(this.wasmMemory.buffer);
-    view.setFloat32(this.STATE_OFFSET + this.REG_PX, 200, true);  // 初期位置X
-    view.setFloat32(this.STATE_OFFSET + this.REG_PY, 125, true);  // 初期位置Y
-    view.setUint32(this.STATE_OFFSET + this.REG_FC, 0, true);     // フレーム
-    view.setFloat32(this.STATE_OFFSET + this.REG_LX, 300, true);  // ⚡ 蛍光灯オブジェクト位置X
-    view.setFloat32(this.STATE_OFFSET + this.REG_LY, 70, true);   // ⚡ 蛍光灯オブジェクト位置Y
-    view.setFloat32(this.STATE_OFFSET + this.REG_DIST, 0, true);  // 初期距離
+    view.setFloat32(this.STATE_OFFSET + this.REG_PX, 200, true);  
+    view.setFloat32(this.STATE_OFFSET + this.REG_PY, 125, true);  
+    view.setUint32(this.STATE_OFFSET + this.REG_FC, 0, true);     
+    view.setFloat32(this.STATE_OFFSET + this.REG_LX, 300, true);  
+    view.setFloat32(this.STATE_OFFSET + this.REG_LY, 70, true);   
+    view.setFloat32(this.STATE_OFFSET + this.REG_DIST, 0, true);  
+    view.setUint32(this.STATE_OFFSET + this.REG_UART_LEN, 0, true); // 初期文字数は0
   }
 
   // 🎮 毎フレーム、統合インプットをメモリに受け取って仮想CPUロジックを回す
@@ -61,7 +64,6 @@ export class VirtualWasmCore {
     let dx = 0;
     let dy = 0;
 
-    // 入力状態を解析
     if (gamepadState.axes.length >= 2) {
       if (Math.abs(gamepadState.axes[0]) > 0.15) dx = gamepadState.axes[0] * 4;
       if (Math.abs(gamepadState.axes[1]) > 0.15) dy = gamepadState.axes[1] * 4;
@@ -75,7 +77,6 @@ export class VirtualWasmCore {
     playerX = Math.max(10, Math.min(this.width - 10, playerX + dx));
     playerY = Math.max(10, Math.min(this.height - 10, playerY + dy));
 
-    // 【距離演算】最寄りの蛍光灯へのユークリッド距離を仮想CPU層でリアルタイム計算
     const ldx = playerX - lightX;
     const ldy = playerY - lightY;
     const distance = Math.sqrt(ldx * ldx + ldy * ldy);
@@ -85,11 +86,22 @@ export class VirtualWasmCore {
     view.setFloat32(this.STATE_OFFSET + this.REG_PY, playerY, true);
     view.setFloat32(this.STATE_OFFSET + this.REG_DIST, distance, true);
 
+    // 📟 【QEMU流: 仮想UART通信処理】
+    // 仮想ハードウェアがアスキー文字列を成形し、Wasm生メモリのUART領域へ直接RAW書き込み！
+    const uartString = `[UART_TX] FRAME:${frameCount} X:${playerX.toFixed(1)} Y:${playerY.toFixed(1)} DIST:${distance.toFixed(1)}`;
+    const u8Memory = new Uint8Array(this.wasmMemory.buffer);
+    
+    for (let i = 0; i < uartString.length; i++) {
+      u8Memory[this.UART_BUF_OFFSET + i] = uartString.charCodeAt(i);
+    }
+    // レジスタに現在の有効文字数をストアして、外部（JavaScript）へ送信完了を通知
+    view.setUint32(this.STATE_OFFSET + this.REG_UART_LEN, uartString.length, true);
+
     // VRAM描画実行
     this.render(playerX, playerY, lightX, lightY, gamepadState.buttons.includes("A"), frameCount);
   }
 
-  // 📡 現在のメモリ上のテレメトリ値を生データで引っこ抜くヘルパーメソッド
+  // 📡 現在のメモリ上のテレメトリ値を生データで引っこ抜くヘルパー
   public getTelemetryData() {
     const view = new DataView(this.wasmMemory.buffer);
     return {
@@ -99,14 +111,23 @@ export class VirtualWasmCore {
     };
   }
 
-  // 📂 【新設】OPFSから復元された過去の「座標」をWasmメモリレジスタに直接書き戻すバックドア命令！
+  // 📟 【新設】JavaScript(QEMU側)がWasmの生メモリ空間から直接シリアル文字列を吸い出すインターセプトメソッド
+  public readVirtualUart(): string {
+    const view = new DataView(this.wasmMemory.buffer);
+    const len = view.getUint32(this.STATE_OFFSET + this.REG_UART_LEN, true);
+    if (len === 0) return "";
+
+    const u8Memory = new Uint8Array(this.wasmMemory.buffer, this.UART_BUF_OFFSET, len);
+    // メモリ上のバイト配列を文字列に一撃デコード（QEMUのMMIO読み出しと同等）
+    return new TextDecoder("utf-8").decode(u8Memory);
+  }
+
   public injectPlayerPosition(x: number, y: number) {
     const view = new DataView(this.wasmMemory.buffer);
     view.setFloat32(this.STATE_OFFSET + this.REG_PX, x, true);
     view.setFloat32(this.STATE_OFFSET + this.REG_PY, y, true);
   }
 
-  // メモリ上のVRAMピクセルを直接いじる超高速レンダラー
   private render(pX: number, pY: number, lX: number, lY: number, isPressed: boolean, frame: number) {
     const lightPulse = Math.sin(frame * 0.1) * 15 + 240; 
 

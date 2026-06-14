@@ -13,19 +13,19 @@ const printLog = (msg: string, color = "#aaa") => {
 
 window.addEventListener('unhandledrejection', (event) => {
   printLog(`🚨 非同期エラー: ${event.reason?.message || event.reason}`, "#ff3366");
-});
+ });
 window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v13-Live]（高輝度シアン）
+// キャッシュ看破タグ [v14-Live]（エレクトリックイエロー）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#00ffff; font-weight:bold;">[v13-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#fff000; font-weight:bold;">[v14-Live]</span>';
 }
 
 function runValidation() {
-  // 📺 描画エンジン（仮想Wasmゲームコア内蔵）を最優先で起動！
+  // 📺 描画エンジン（本物仕様のWasmメモリ空間内蔵）を最優先で起動！
   initDisplay("deck-screen");
 
   const btnHead = document.getElementById("btn-fetch-head");

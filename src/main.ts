@@ -18,10 +18,10 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v12-Live]（ネオングリーン）
+// キャッシュ看破タグ [v13-Live]（高輝度シアン）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#39ff14; font-weight:bold;">[v12-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#00ffff; font-weight:bold;">[v13-Live]</span>';
 }
 
 function runValidation() {

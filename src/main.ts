@@ -17,10 +17,10 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v8-Live]（緑）
+// キャッシュ看破タグ [v9-Live]（ド派手な紫）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#00ff00; font-weight:bold;">[v8-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#ff00ff; font-weight:bold;">[v9-Live]</span>';
 }
 
 function runValidation() {
@@ -30,17 +30,18 @@ function runValidation() {
   
   if (!btnHead || !btnTail || !streamLogEl) return;
 
-  // 共通のフェッチ処理（イベント強奪を完全にガード）
+  // 🎯 ターゲットURLを自作APIルートに変更！これでVercelの静的416バグを完全回避
+  const targetUrl = "/api/dummy";
+
   const executeFetch = async (e: Event, offset: number) => {
-    // 🔥 【超重要】裏のゲーム画面のスクリプトにタッチイベントを盗まれないように完全に遮断！
     e.stopPropagation();
     e.preventDefault();
 
     const label = offset === 0 ? "0MB" : "10MB";
-    printLog(`📱 [${label}] タップを極限検知！ストリーム開始...`, "#00ffcc");
+    printLog(`📱 [${label}] タップ検知！API経由ストリーム開始...`, "#00ffcc");
 
     try {
-      const res = await streamToOPFS("/dummy_game.bin", offset, 1024);
+      const res = await streamToOPFS(targetUrl, offset, 1024);
       printLog(res, res.includes("失敗") ? "#ff3366" : "#aaa");
     } catch (err: any) {
       printLog(`❌ フェッチエラー: ${err.message || err}`, "#ff3366");
@@ -52,15 +53,10 @@ function runValidation() {
     }).catch(() => {});
   };
 
-  // clickの代わりに、タッチした瞬間に反応する pointerdown を採用
   btnHead.addEventListener("pointerdown", (e) => executeFetch(e, 0), { passive: false });
   btnTail.addEventListener("pointerdown", (e) => executeFetch(e, 10000000), { passive: false });
-  
-  // 念のため従来のclickもセーフティとして残す（同様にバブリング停止）
-  btnHead.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); });
-  btnTail.addEventListener("click", (e) => { e.stopPropagation(); e.preventDefault(); });
 
-  // 以降のステータスチェック
+  // ステータスチェック系
   const sabEl = document.getElementById("status-sab")!;
   if (typeof SharedArrayBuffer !== "undefined") {
     sabEl.textContent = "有効"; sabEl.className = "ok";

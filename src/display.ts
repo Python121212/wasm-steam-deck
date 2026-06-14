@@ -13,26 +13,24 @@ export function initDisplay(canvasId: string) {
   canvas.width = WIDTH;
   canvas.height = HEIGHT;
 
-  // 🚀 本尊：Wasmゲームコアのインスタンス化！
+  // 🚀 本格化：本物のWebAssembly.Memory構造を内蔵したゲームコアをインスタンス化！
   const wasmCore = new VirtualWasmCore(WIDTH, HEIGHT);
   
-  // 🔥 【TypeScript型エラー対策】
-  // 最新のTS型定義による Uint8ClampedArray(ArrayBufferLike) と ImageDataArray の内部的な型不整合を回避するため、
-  // 明示的に `as any` キャストを通してビルドの門番を突破します。
-  const imageData = new ImageData(wasmCore.memory as any, WIDTH, HEIGHT);
+  // Wasmのメモリ空間から切り出されたVRAM配列を直接ラップし、Canvas転送用にバインド
+  const imageData = new ImageData(wasmCore.vram as any, WIDTH, HEIGHT);
 
   function renderLoop() {
     if (!ctx) return;
 
-    // 1. Wasmコアに最新のコントローラー入力を叩き込んで、内部メモリ(VRAM)を更新させる
+    // 1. 本物のWasm共有メモリ上でインプット＆ゲームロジック（仮想CPU）を毎フレームぶん回す
     wasmCore.tick(currentGamepadState);
 
-    // 2. 更新されたWasmのメモリデータを、そのまま一撃でCanvasに超高速転送！
+    // 2. Wasmメモリ内のVRAM領域の最新ピクセルデータを、一撃でCanvasへ超高速転送！
     ctx.putImageData(imageData, 0, 0);
 
     requestAnimationFrame(renderLoop);
   }
 
   requestAnimationFrame(renderLoop);
-  console.log("📺 Wasmメモリ直結型・高速レンダリングループが起動しました。");
+  console.log("📺 WebAssembly共有メモリ直結・高速レンダリングループが起動しました。");
 }

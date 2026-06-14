@@ -24,7 +24,7 @@ export function initDisplay(canvasId: string) {
   
   const imageData = new ImageData(wasmCore.vram as any, WIDTH, HEIGHT);
 
-  // テレメトリHUDオーバーレイの動的生成
+  // 📡 リアルタイムテレメトリHUD（右上絶対配置）
   let telemetryOverlay = document.getElementById("telemetry-overlay");
   if (!telemetryOverlay && canvas.parentElement) {
     telemetryOverlay = document.createElement("div");
@@ -45,19 +45,19 @@ export function initDisplay(canvasId: string) {
     canvas.parentElement.appendChild(telemetryOverlay);
   }
 
-  // 📟 【新設】QEMU風シリアルモニター用ターミナルUIの動的配置
+  // 📟 【レイアウト改善】QEMU風シリアルモニターをCanvasの真下（外側）へ完全パージ！
   let serialTerminal = document.getElementById("serial-terminal");
   if (!serialTerminal && canvas.parentElement) {
     serialTerminal = document.createElement("div");
     serialTerminal.id = "serial-terminal";
     serialTerminal.style.position = "absolute";
-    serialTerminal.style.bottom = "10px";
-    serialTerminal.style.left = "10px";
-    serialTerminal.style.right = "10px";
-    serialTerminal.style.background = "rgba(0, 0, 0, 0.8)";
-    serialTerminal.style.color = "#bb88ff"; // シリアルは妖艶なパープルネオン
+    serialTerminal.style.top = "260px"; // 👈 Canvas(250px)の下側に完全に押し出し、重なりを排除！
+    serialTerminal.style.left = "0px";
+    serialTerminal.style.right = "0px";
+    serialTerminal.style.background = "rgba(5, 5, 10, 0.9)";
+    serialTerminal.style.color = "#bb88ff"; // シリアルネオンパープル
     serialTerminal.style.fontFamily = "'Courier New', monospace";
-    serialTerminal.style.padding = "4px 8px";
+    serialTerminal.style.padding = "6px 12px";
     serialTerminal.style.fontSize = "10px";
     serialTerminal.style.borderRadius = "4px";
     serialTerminal.style.border = "1px solid #bb88ff";
@@ -65,18 +65,21 @@ export function initDisplay(canvasId: string) {
     serialTerminal.style.whiteSpace = "nowrap";
     serialTerminal.style.overflow = "hidden";
     serialTerminal.style.textOverflow = "ellipsis";
+    serialTerminal.style.boxShadow = "0 4px 10px rgba(187, 136, 255, 0.2)";
     
+    // 親コンテナの下部に余裕を持たせる
+    canvas.parentElement.style.marginBottom = "45px";
     canvas.parentElement.appendChild(serialTerminal);
   }
 
   function renderLoop() {
     if (!ctx) return;
 
-    // 仮想ハードウェアのクロックを進める
+    // 仮想ハードウェアのクロック駆動
     wasmCore.tick(currentGamepadState);
     ctx.putImageData(imageData, 0, 0);
 
-    // 1. 標準テレメトリの描画
+    // 1. HUDテレメトリ更新
     const telemetry = wasmCore.getTelemetryData();
     if (telemetryOverlay) {
       telemetryOverlay.innerHTML = `
@@ -86,7 +89,7 @@ export function initDisplay(canvasId: string) {
       `;
     }
 
-    // 2. 📟 【QEMUエミュレーション傍受】Wasm生メモリのUART空間からデータを直接読み取って表示！
+    // 2. 📟 Wasm生メモリのUART空間からデータを直接デコードして外側コンソールに印字
     const uartLog = wasmCore.readVirtualUart();
     if (serialTerminal && uartLog) {
       serialTerminal.textContent = `📟 QEMU_UART_MONITOR: ${uartLog}`;
@@ -96,5 +99,5 @@ export function initDisplay(canvasId: string) {
   }
 
   requestAnimationFrame(renderLoop);
-  console.log("📺 QEMUシリアルバス・MMIOモニタリングシステムが完全起動しました。");
+  console.log("📺 画面被りを解消したQEMUシリアルバス・モニタリングシステムが再起動しました。");
 }

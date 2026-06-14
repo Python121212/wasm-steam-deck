@@ -8,11 +8,11 @@ export class VirtualWasmCore {
   private width: number;
   private height: number;
 
-  // 🗺️ エミュレータでおなじみの「メモリマップ（アドレス配置）」を自前で定義
-  // 400x250x4バイト = 250,000バイト（約244KB）をVRAMとして0番地から配置
+  // 🗺️ メモリマップ（アドレス配置）の修正
+  // 400x250x4バイト = 正しくは「400,000バイト」です！
   private readonly VRAM_OFFSET = 0;
-  // VRAM領域のすぐ後ろ（250,000バイト目）を変数・ステータス格納用レジスタ空間とする
-  private readonly STATE_OFFSET = 250000; 
+  // VRAM領域（0〜399,999番地）のすぐ後ろ（400,000番地）を変数・ステータス格納用レジスタ空間とします
+  private readonly STATE_OFFSET = 400000; 
 
   constructor(width: number, height: number) {
     this.width = width;
@@ -21,7 +21,7 @@ export class VirtualWasmCore {
     // WebAssemblyメモリを初期サイズ8ページ（8 ✕ 64KB = 512KB）確保
     this.wasmMemory = new WebAssembly.Memory({ initial: 8 });
 
-    // 確保したWasmメモリの生バッファから、Canvas描画用のVRAM領域（250KB分）をダイレクトに切り出す
+    // 確保したWasmメモリの生バッファから、Canvas描画用のVRAM領域（400KB分）をダイレクトに切り出す
     this.vram = new Uint8ClampedArray(
       this.wasmMemory.buffer,
       this.VRAM_OFFSET,
@@ -30,9 +30,9 @@ export class VirtualWasmCore {
 
     // 💾 Wasmのメモリマップに初期値をバイト単位で直接書き込む（DataViewを使用）
     const view = new DataView(this.wasmMemory.buffer);
-    view.setFloat32(this.STATE_OFFSET + 0, 200, true);  // 250000番地: プレイヤーX座標 (float32)
-    view.setFloat32(this.STATE_OFFSET + 4, 125, true);  // 250004番地: プレイヤーY座標 (float32)
-    view.setUint32(this.STATE_OFFSET + 8, 0, true);     // 250008番地: フレームカウンター (uint32)
+    view.setFloat32(this.STATE_OFFSET + 0, 200, true);  // 400000番地: プレイヤーX座標 (float32)
+    view.setFloat32(this.STATE_OFFSET + 4, 125, true);  // 400004番地: プレイヤーY座標 (float32)
+    view.setUint32(this.STATE_OFFSET + 8, 0, true);     // 400008番地: フレームカウンター (uint32)
   }
 
   // 🎮 毎フレーム、統合インプットをメモリに受け取って仮想CPUロジックを回す
@@ -65,7 +65,7 @@ export class VirtualWasmCore {
     playerX = Math.max(10, Math.min(this.width - 10, playerX + dx));
     playerY = Math.max(10, Math.min(this.height - 10, playerY + dy));
 
-    // 演算結果をWasmの変数アドレスへ再ストア
+    // 演算結果をWasmの変数アドレスへ再ストア（これで背景に潰されなくなります！）
     view.setFloat32(this.STATE_OFFSET + 0, playerX, true);
     view.setFloat32(this.STATE_OFFSET + 4, playerY, true);
 

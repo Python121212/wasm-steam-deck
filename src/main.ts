@@ -18,10 +18,10 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v16-Live]（サイバーライム）
+// キャッシュ看破タグ [v17-Live]（サイバーオレンジ）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#39ff14; font-weight:bold;">[v16-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#ffaa00; font-weight:bold;">[v17-Live]</span>';
 }
 
 function runValidation() {
@@ -36,9 +36,12 @@ function runValidation() {
 
   const targetUrl = "/api/dummy";
 
-  // 💾 【伏線回収】ユーザー専用：現在の座標と最寄り蛍光灯への距離をOPFSへ永続記録するサイバーボタンを動的インジェクション！
+  // 📝 各種コントロールボタンのコンテナを取得
   const btnContainer = btnHead.parentElement;
   if (btnContainer) {
+    // ----------------------------------------------------
+    // 💾 【セーブボタン】前回作成した記録用ネオンボタン
+    // ----------------------------------------------------
     const btnSave = document.createElement("button");
     btnSave.id = "btn-save-telemetry";
     btnSave.textContent = "💾 座標・蛍光灯距離をOPFSに記録";
@@ -52,31 +55,22 @@ function runValidation() {
     btnSave.style.fontWeight = "bold";
     btnSave.style.fontSize = "11px";
     btnSave.style.boxShadow = "0 0 10px rgba(0,255,204,0.5)";
-    
     btnContainer.appendChild(btnSave);
     
     btnSave.addEventListener("pointerdown", async (e) => {
-      e.stopPropagation();
-      e.preventDefault();
-      
+      e.stopPropagation(); e.preventDefault();
       printLog("💾 OPFSへのテレメトリデータ書き込みを開始...", "#00ffcc");
       try {
         const activeCore = getActiveWasmCore();
         if (!activeCore) throw new Error("WasmCoreが初期化されていません");
 
-        // 1. Wasmメモリの共有レジスタ空間から、現在の生の「座標」と「最短距離」を瞬時に抽出
         const telemetry = activeCore.getTelemetryData();
-        
-        // 2. 高速ファイルシステム（OPFS）のハンドルを取得し、ログファイルを開く
         const root = await navigator.storage.getDirectory();
         const fileHandle = await root.getFileHandle("light_telemetry.txt", { create: true });
         const writable = await fileHandle.createWritable({ keepExistingData: true });
-        
-        // 3. ファイルの現在の限界末尾にシーク（追記モード）
         const file = await fileHandle.getFile();
         await writable.seek(file.size);
         
-        // 4. 高精度なログ文字列を成形してディスクへ直接フラッシュ書き込み
         const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
         const logLine = `[${timestamp}] X:${telemetry.x.toFixed(2)} Y:${telemetry.y.toFixed(2)} Dist:${telemetry.distance.toFixed(2)}\n`;
         
@@ -85,21 +79,77 @@ function runValidation() {
         
         printLog(`✅ OPFS書き込み成功! [${timestamp}] 距離:${telemetry.distance.toFixed(1)}px`, "#39ff14");
         
-        // 仮想ディスクサイズ表示を即時更新
         const size = await getVirtualFileSize();
         const diskSizeEl = document.getElementById("disk-size");
         if (diskSizeEl) diskSizeEl.textContent = size.toLocaleString();
-
       } catch (err: any) {
         printLog(`❌ 保存失敗: ${err.message || err}`, "#ff3366");
+      }
+    }, { passive: false });
+
+    // ----------------------------------------------------
+    // 📂 【新設ロードボタン】「後で使う」を今ここで回収！
+    // ----------------------------------------------------
+    const btnLoad = document.createElement("button");
+    btnLoad.id = "btn-load-telemetry";
+    btnLoad.textContent = "📂 OPFSから最新の記録をロードして復元";
+    btnLoad.style.background = "linear-gradient(135deg, #ffaa00, #ff5500)";
+    btnLoad.style.color = "#fff";
+    btnLoad.style.border = "none";
+    btnLoad.style.padding = "6px 12px";
+    btnLoad.style.margin = "4px";
+    btnLoad.style.borderRadius = "4px";
+    btnLoad.style.cursor = "pointer";
+    btnLoad.style.fontWeight = "bold";
+    btnLoad.style.fontSize = "11px";
+    btnLoad.style.boxShadow = "0 0 10px rgba(255,170,0,0.5)";
+    btnContainer.appendChild(btnLoad);
+
+    btnLoad.addEventListener("pointerdown", async (e) => {
+      e.stopPropagation(); e.preventDefault();
+      printLog("📂 OPFSのログを解析中...", "#ffaa00");
+
+      try {
+        const activeCore = getActiveWasmCore();
+        if (!activeCore) throw new Error("WasmCoreが見つかりません");
+
+        // 1. OPFSからログファイルを開いてテキストとして全読み込み
+        const root = await navigator.storage.getDirectory();
+        const fileHandle = await root.getFileHandle("light_telemetry.txt", { create: true });
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+
+        if (!text.trim()) {
+          throw new Error("保存されたログデータがまだ空っぽです。先にセーブしてください！");
+        }
+
+        // 2. 改行で区切って、一番最後の有効な行（最新のログ）を特定
+        const lines = text.trim().split("\n");
+        const lastLine = lines[lines.length - 1];
+
+        // 3. 正規表現を使って、文字列から「X」と「Y」の数値をぶっこ抜く
+        const matchX = lastLine.match(/X:([\d.]+)/);
+        const matchY = lastLine.match(/Y:([\d.]+)/);
+
+        if (!matchX || !matchY) {
+          throw new Error("ログのデータ形式が不正です");
+        }
+
+        const savedX = parseFloat(matchX[1]);
+        const savedY = parseFloat(matchY[1]);
+
+        // 4. 解析した過去の座標データを、Wasmの生メモリ空間へ直接注入！
+        activeCore.injectPlayerPosition(savedX, savedY);
+
+        printLog(`⚡ タイムワープ成功! 過去の位置 (${savedX.toFixed(1)}, ${savedY.toFixed(1)}) をWasmメモリに復元しました。`, "#39ff14");
+      } catch (err: any) {
+        printLog(`❌ ロード失敗: ${err.message || err}`, "#ff3366");
       }
     }, { passive: false });
   }
 
   const executeFetch = async (e: Event, offset: number) => {
-    e.stopPropagation();
-    e.preventDefault();
-
+    e.stopPropagation(); e.preventDefault();
     const label = offset === 0 ? "0MB" : "10MB";
     printLog(`📱 [${label}] タップ検知！API経由ストリーム開始...`, "#00ffcc");
 

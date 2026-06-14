@@ -18,14 +18,13 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v18-Live]（サイバーパープル）
+// キャッシュ看破タグ [v19-Core]（輝くネオンゴールド）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#bb88ff; font-weight:bold;">[v18-Live]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#ffcc00; font-weight:bold;">[v19-Core]</span>';
 }
 
 function runValidation() {
-  // 📺 描画・仮想UART通信統合ディスプレイの起動
   initDisplay("deck-screen");
 
   const btnHead = document.getElementById("btn-fetch-head");
@@ -38,10 +37,10 @@ function runValidation() {
 
   const btnContainer = btnHead.parentElement;
   if (btnContainer) {
-    // 💾 【セーブボタン】座標・蛍光灯距離をOPFSに記録
+    // 💾 【セーブボタン】純粋な座標とCPU状態の永続化
     const btnSave = document.createElement("button");
     btnSave.id = "btn-save-telemetry";
-    btnSave.textContent = "💾 座標・蛍光灯距離をOPFSに記録";
+    btnSave.textContent = "💾 座標・CPU状態をOPFSに記録";
     btnSave.style.background = "linear-gradient(135deg, #00ffcc, #0077ff)";
     btnSave.style.color = "#000";
     btnSave.style.border = "none";
@@ -56,25 +55,26 @@ function runValidation() {
     
     btnSave.addEventListener("pointerdown", async (e) => {
       e.stopPropagation(); e.preventDefault();
-      printLog("💾 OPFSへのテレメトリデータ書き込みを開始...", "#00ffcc");
+      printLog("💾 OPFSへのシステムデータ書き込みを開始...", "#00ffcc");
       try {
         const activeCore = getActiveWasmCore();
         if (!activeCore) throw new Error("WasmCoreが初期化されていません");
 
         const telemetry = activeCore.getTelemetryData();
         const root = await navigator.storage.getDirectory();
-        const fileHandle = await root.getFileHandle("light_telemetry.txt", { create: true });
+        // ファイル名をコアテレメトリへ変更
+        const fileHandle = await root.getFileHandle("core_telemetry.txt", { create: true });
         const writable = await fileHandle.createWritable({ keepExistingData: true });
         const file = await fileHandle.getFile();
         await writable.seek(file.size);
         
         const timestamp = new Date().toISOString().split('T')[1].slice(0, 8);
-        const logLine = `[${timestamp}] X:${telemetry.x.toFixed(2)} Y:${telemetry.y.toFixed(2)} Dist:${telemetry.distance.toFixed(2)}\n`;
+        const logLine = `[${timestamp}] X:${telemetry.x.toFixed(2)} Y:${telemetry.y.toFixed(2)} PC:0x${telemetry.pc.toString(16).toUpperCase()}\n`;
         
         await writable.write(logLine);
         await writable.close();
         
-        printLog(`✅ OPFS書き込み成功! [${timestamp}] 距離:${telemetry.distance.toFixed(1)}px`, "#39ff14");
+        printLog(`✅ OPFS書き込み成功! [${timestamp}] PC:0x${telemetry.pc.toString(16).toUpperCase()}`, "#39ff14");
         
         const size = await getVirtualFileSize();
         const diskSizeEl = document.getElementById("disk-size");
@@ -87,7 +87,7 @@ function runValidation() {
     // 📂 【ロードボタン】タイムワープ復元
     const btnLoad = document.createElement("button");
     btnLoad.id = "btn-load-telemetry";
-    btnLoad.textContent = "📂 OPFSから最新の記録をロードして復元";
+    btnLoad.textContent = "📂 OPFSからシステムデータをロードして復元";
     btnLoad.style.background = "linear-gradient(135deg, #ffaa00, #ff5500)";
     btnLoad.style.color = "#fff";
     btnLoad.style.border = "none";
@@ -102,19 +102,19 @@ function runValidation() {
 
     btnLoad.addEventListener("pointerdown", async (e) => {
       e.stopPropagation(); e.preventDefault();
-      printLog("📂 OPFSのログを解析中...", "#ffaa00");
+      printLog("📂 OPFSのコアログを解析中...", "#ffaa00");
 
       try {
         const activeCore = getActiveWasmCore();
         if (!activeCore) throw new Error("WasmCoreが見つかりません");
 
         const root = await navigator.storage.getDirectory();
-        const fileHandle = await root.getFileHandle("light_telemetry.txt", { create: true });
+        const fileHandle = await root.getFileHandle("core_telemetry.txt", { create: true });
         const file = await fileHandle.getFile();
         const text = await file.text();
 
         if (!text.trim()) {
-          throw new Error("保存されたログデータがまだ空っぽです。先にセーブしてください！");
+          throw new Error("保存されたコアログデータが空です。先にセーブしてください！");
         }
 
         const lines = text.trim().split("\n");
@@ -132,7 +132,7 @@ function runValidation() {
 
         activeCore.injectPlayerPosition(savedX, savedY);
 
-        printLog(`⚡ タイムワープ成功! 過去の位置 (${savedX.toFixed(1)}, ${savedY.toFixed(1)}) をWasmメモリに復元しました。`, "#39ff14");
+        printLog(`⚡ コア復元成功! 過去の位置 (${savedX.toFixed(1)}, ${savedY.toFixed(1)}) をWasmメモリに注入しました。`, "#39ff14");
       } catch (err: any) {
         printLog(`❌ ロード失敗: ${err.message || err}`, "#ff3366");
       }

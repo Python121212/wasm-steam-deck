@@ -1,1 +1,8 @@
-
+{
+  "short_name": "WasmDeck",
+  "name": "Wasm Steam Deck Foundation",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f0f",
+  "theme_color": "#0f0f0f"
+}

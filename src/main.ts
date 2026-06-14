@@ -18,14 +18,14 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v17-Fix]（燃えるネオンレッド）
+// キャッシュ看破タグ [v18-Live]（サイバーパープル）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#ff3366; font-weight:bold;">[v17-Fix]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#bb88ff; font-weight:bold;">[v18-Live]</span>';
 }
 
 function runValidation() {
-  // 📺 描画エンジン起動
+  // 📺 描画・仮想UART通信統合ディスプレイの起動
   initDisplay("deck-screen");
 
   const btnHead = document.getElementById("btn-fetch-head");
@@ -36,10 +36,9 @@ function runValidation() {
 
   const targetUrl = "/api/dummy";
 
-  // 📝 各種コントロールボタンのコンテナを取得
   const btnContainer = btnHead.parentElement;
   if (btnContainer) {
-    // 💾 【セーブボタン】前回作成した記録用ネオンボタン
+    // 💾 【セーブボタン】座標・蛍光灯距離をOPFSに記録
     const btnSave = document.createElement("button");
     btnSave.id = "btn-save-telemetry";
     btnSave.textContent = "💾 座標・蛍光灯距離をOPFSに記録";

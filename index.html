@@ -1,33 +1,18 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Wasm Steam Deck</title>
+    <meta charset="UTF-8">
+    <title>Wasm Steam Deck</title>
 </head>
 <body>
-  <canvas id="deck-screen"></canvas>
-  
-  <div id="debug-overlay" style="position: absolute; top: 10px; left: 10px; z-index: 10; pointer-events: none;">
-    <h2>Wasm Steam Deck</h2>
-    <div>SAB: <span id="status-sab">-</span></div>
-    <div>OPFS: <span id="status-opfs">-</span></div>
-    <div>インプット: <span id="status-gamepad">-</span></div>
-    <div>ディスクサイズ: <span id="disk-size">0</span> bytes</div>
-    <div id="stream-log"></div>
-    <div style="margin-top: 5px;">
-      <button id="btn-fetch-head" style="pointer-events: auto;">0MB Fetch</button>
-      <button id="btn-fetch-tail" style="pointer-events: auto;">10MB Fetch</button>
+    <div id="debug-overlay">
+        <h2>System Status</h2>
     </div>
-  </div>
 
-  <div id="virtual-controller">
-    <div id="v-stick-base">
-      <div id="v-stick-knob"></div>
+    <div id="log-container" style="width: 100%; height: 250px; background: #000; border-top: 2px solid #333; overflow-y: scroll;">
+        <pre id="stream-log" style="color: #39ff14; font-family: 'Courier New', Courier, monospace; padding: 10px; margin: 0;"></pre>
     </div>
-    <div id="v-btn-a">A</div>
-  </div>
 
-  <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

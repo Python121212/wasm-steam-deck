@@ -1,29 +1,32 @@
+// 🎮 Wasmコアがいつでも覗き見にこれる、グローバルな最新入力レジスタ
+export const currentGamepadState = {
+  buttons: [] as string[],
+  axes: [] as number[]
+};
+
 export function initGamepad(updateStatus: (msg: string) => void) {
   let gamepadIndex: number | null = null;
   let animationFrameId: number | null = null;
 
-  // コントローラーが新しく接続されたとき
   window.addEventListener("gamepadconnected", (e) => {
     gamepadIndex = e.gamepad.index;
-    console.log("Gamepad connected:", e.gamepad);
     triggerLoop();
   });
 
-  // コントローラーが切断されたとき
   window.addEventListener("gamepaddisconnected", (e) => {
     if (gamepadIndex === e.gamepad.index) {
       gamepadIndex = null;
       if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      currentGamepadState.buttons = [];
+      currentGamepadState.axes = [];
       updateStatus("❌ 未接続");
     }
   });
 
-  // 🕹️ 1ms単位で入力を監視し、画面のステータスを一瞬で書き換える高速ループ
   function triggerLoop() {
     function checkInput() {
       if (gamepadIndex === null) return;
       
-      // 最新のゲームパッド状態を取得
       const gamepads = navigator.getGamepads();
       const gp = gamepads[gamepadIndex];
 
@@ -32,38 +35,35 @@ export function initGamepad(updateStatus: (msg: string) => void) {
         return;
       }
 
-      // ① 押されているボタンの検出 (A, B, X, Y, トリガー等)
+      // レジスタをクリアして最新状態を格納
       const pressedButtons: string[] = [];
       gp.buttons.forEach((btn, idx) => {
         if (btn.pressed) {
-          // 主要なボタンにわかりやすい名前を割り当て
           if (idx === 0) pressedButtons.push("A");
           else if (idx === 1) pressedButtons.push("B");
           else if (idx === 2) pressedButtons.push("X");
           else if (idx === 3) pressedButtons.push("Y");
-          else pressedButtons.push(`B${idx}`); // L/Rやセレクトなど
+          else pressedButtons.push(`B${idx}`);
         }
       });
 
-      // ② アナログスティックの検出 (デッドゾーン 0.15 で誤作動防止)
+      // スティックの値をそのまま配列にコピー
+      currentGamepadState.buttons = pressedButtons;
+      currentGamepadState.axes = [...gp.axes];
+
+      // 画面表示用の文字列生成
       const activeAxes: string[] = [];
       gp.axes.forEach((axis, idx) => {
         if (Math.abs(axis) > 0.15) {
           const dir = axis > 0 ? "+" : "";
-          if (idx === 0) activeEntries(activeAxes, `LスティックX:${dir}${axis.toFixed(1)}`);
-          if (idx === 1) activeEntries(activeAxes, `LスティックY:${dir}${axis.toFixed(1)}`);
-          if (idx === 2) activeEntries(activeAxes, `RスティックX:${dir}${axis.toFixed(1)}`);
-          if (idx === 3) activeEntries(activeAxes, `RスティックY:${dir}${axis.toFixed(1)}`);
+          if (idx === 0) activeAxes.push(`LX:${dir}${axis.toFixed(1)}`);
+          if (idx === 1) activeAxes.push(`LY:${dir}${axis.toFixed(1)}`);
         }
       });
 
-      // 画面の「🕹️ コントローラー: 」の後ろにはめ込む文字列を生成
       let statusText = `🟢 接続中: ${gp.id.slice(0, 12)}...`;
-      
       if (pressedButtons.length > 0 || activeAxes.length > 0) {
-        const btnStr = pressedButtons.length > 0 ? ` [${pressedButtons.join(",")}]` : "";
-        const axisStr = activeAxes.length > 0 ? ` [${activeAxes.join(" ")}]` : "";
-        statusText = `🎮 入力中:${btnStr}${axisStr}`;
+        statusText = `🎮 入力中: [${pressedButtons.join(",")}] [${activeAxes.join(" ")}]`;
       }
 
       updateStatus(statusText);
@@ -74,16 +74,8 @@ export function initGamepad(updateStatus: (msg: string) => void) {
     animationFrameId = requestAnimationFrame(checkInput);
   }
 
-  function activeEntries(arr: string[], val: string) {
-    arr.push(val);
-  }
-
-  // 🔥 【スマホ専用フォールバック】
-  // スマホのブラウザは「接続済み」のコントローラーがあっても、画面を1回触るまで隠す仕様があるため、
-  // 画面がタップされた瞬間に強制的にコントローラーをサーチしにいきます。
   const touchTrigger = () => {
-    if (gamepadIndex !== null) return; // 既に掴んでるならスルー
-    
+    if (gamepadIndex !== null) return;
     const gamepads = navigator.getGamepads();
     for (const gp of gamepads) {
       if (gp) {

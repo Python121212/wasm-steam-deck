@@ -24,7 +24,7 @@ export function initDisplay(canvasId: string) {
   
   const imageData = new ImageData(wasmCore.vram as any, WIDTH, HEIGHT);
 
-  // リアルタイムテレメトリ表示用の美麗なHUDオーバーレイDOMを動的に生成
+  // テレメトリHUDオーバーレイの動的生成
   let telemetryOverlay = document.getElementById("telemetry-overlay");
   if (!telemetryOverlay && canvas.parentElement) {
     telemetryOverlay = document.createElement("div");
@@ -45,12 +45,38 @@ export function initDisplay(canvasId: string) {
     canvas.parentElement.appendChild(telemetryOverlay);
   }
 
+  // 📟 【新設】QEMU風シリアルモニター用ターミナルUIの動的配置
+  let serialTerminal = document.getElementById("serial-terminal");
+  if (!serialTerminal && canvas.parentElement) {
+    serialTerminal = document.createElement("div");
+    serialTerminal.id = "serial-terminal";
+    serialTerminal.style.position = "absolute";
+    serialTerminal.style.bottom = "10px";
+    serialTerminal.style.left = "10px";
+    serialTerminal.style.right = "10px";
+    serialTerminal.style.background = "rgba(0, 0, 0, 0.8)";
+    serialTerminal.style.color = "#bb88ff"; // シリアルは妖艶なパープルネオン
+    serialTerminal.style.fontFamily = "'Courier New', monospace";
+    serialTerminal.style.padding = "4px 8px";
+    serialTerminal.style.fontSize = "10px";
+    serialTerminal.style.borderRadius = "4px";
+    serialTerminal.style.border = "1px solid #bb88ff";
+    serialTerminal.style.pointerEvents = "none";
+    serialTerminal.style.whiteSpace = "nowrap";
+    serialTerminal.style.overflow = "hidden";
+    serialTerminal.style.textOverflow = "ellipsis";
+    
+    canvas.parentElement.appendChild(serialTerminal);
+  }
+
   function renderLoop() {
     if (!ctx) return;
 
+    // 仮想ハードウェアのクロックを進める
     wasmCore.tick(currentGamepadState);
     ctx.putImageData(imageData, 0, 0);
 
+    // 1. 標準テレメトリの描画
     const telemetry = wasmCore.getTelemetryData();
     if (telemetryOverlay) {
       telemetryOverlay.innerHTML = `
@@ -60,9 +86,15 @@ export function initDisplay(canvasId: string) {
       `;
     }
 
+    // 2. 📟 【QEMUエミュレーション傍受】Wasm生メモリのUART空間からデータを直接読み取って表示！
+    const uartLog = wasmCore.readVirtualUart();
+    if (serialTerminal && uartLog) {
+      serialTerminal.textContent = `📟 QEMU_UART_MONITOR: ${uartLog}`;
+    }
+
     requestAnimationFrame(renderLoop);
   }
 
   requestAnimationFrame(renderLoop);
-  console.log("📺 蛍光灯距離演算レイヤー内蔵・Wasmメモリレンダラーが起動しました。");
+  console.log("📺 QEMUシリアルバス・MMIOモニタリングシステムが完全起動しました。");
 }

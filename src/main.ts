@@ -18,10 +18,10 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v20-OSBoot]（鮮烈なネオンライムグリーン）
+// キャッシュ看破タグ [v20-Fix]（ネオンライム）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
-  title.innerHTML += ' <span style="font-size:12px; color:#39ff14; font-weight:bold;">[v20-OSBoot]</span>';
+  title.innerHTML += ' <span style="font-size:12px; color:#39ff14; font-weight:bold;">[v20-Fix]</span>';
 }
 
 function runValidation() {

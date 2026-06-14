@@ -18,7 +18,6 @@ window.addEventListener('error', (event) => {
   printLog(`🚨 システムエラー: ${event.message}`, "#ff3366");
 });
 
-// キャッシュ看破タグ [v20-Fix]（ネオンライム）
 const title = document.querySelector("#debug-overlay h2");
 if (title) {
   title.innerHTML += ' <span style="font-size:12px; color:#39ff14; font-weight:bold;">[v20-Fix]</span>';
@@ -37,7 +36,6 @@ function runValidation() {
 
   const btnContainer = btnHead.parentElement;
   if (btnContainer) {
-    // 💾 【CPUステートセーブ】レジスタファイルとPCをOPFSへダンプ
     const btnSave = document.createElement("button");
     btnSave.id = "btn-save-telemetry";
     btnSave.textContent = "💾 CPUステートをOPFSにスナップショット保存";
@@ -65,7 +63,6 @@ function runValidation() {
         const fileHandle = await root.getFileHandle("cpu_state.json", { create: true });
         const writable = await fileHandle.createWritable();
         
-        // PCと全32個のレジスタ配列をJSON構造として保存
         const statePayload = {
           pc: cpu.pc,
           registers: cpu.allRegs,
@@ -85,7 +82,6 @@ function runValidation() {
       }
     }, { passive: false });
 
-    // 📂 【CPUステートロード】保存されたスナップショットからCPU状態をインジェクションして再開
     const btnLoad = document.createElement("button");
     btnLoad.id = "btn-load-telemetry";
     btnLoad.textContent = "📂 OPFSからCPUステートを復元（コールドリブート）";
@@ -153,7 +149,7 @@ function runValidation() {
   if (typeof SharedArrayBuffer !== "undefined") {
     sabEl.textContent = "有効"; sabEl.className = "ok";
   } else {
-    sabEl.textContent = "無egu無効"; sabEl.className = "ng";
+    sabEl.textContent = "無効"; sabEl.className = "ng";
   }
 
   const gamepadEl = document.getElementById("status-gamepad")!;
@@ -176,33 +172,36 @@ function runValidation() {
     }
   }, 50);
 
-  // 🐧 🔥 【重要：新規追加】仮想UARTシリアルバッファログを画面下の黒いコンソール帯にリアルタイム反映するポーリングループ
+  // 🐧 リアルタイム反映ポーリングループ（確定反映版）
   const logTerminalEl = document.getElementById("stream-log");
   if (logTerminalEl) {
-    // 読みやすさ向上のため、コンソールのスタイルを少しハッカーらしく調整
     logTerminalEl.style.fontFamily = "'Courier New', Courier, monospace";
-    logTerminalEl.style.fontSize = "12px";
-    logTerminalEl.style.lineHeight = "1.4";
+    logTerminalEl.style.fontSize = "13px";
+    logTerminalEl.style.lineHeight = "1.5";
     logTerminalEl.style.whiteSpace = "pre-wrap";
-    logTerminalEl.style.padding = "10px";
-    logTerminalEl.style.color = "#39ff14"; // サイバーグリーン
+    logTerminalEl.style.padding = "12px";
+    logTerminalEl.style.color = "#39ff14"; 
     logTerminalEl.style.overflowY = "auto";
-    logTerminalEl.style.maxHeight = "100%";
+    logTerminalEl.style.backgroundColor = "#000";
 
     const pollUartLog = () => {
       const activeCore = getActiveWasmCore();
       if (activeCore) {
+        // 🔥 【今回の最重要ポイント】
+        // もしすでにCPUが走りきって止まっていたら、強制的に1回PCを先頭(0x80000000)に戻して再実行させる
+        const telemetry = activeCore.getTelemetryData();
+        if (telemetry.pc === 0x80000020) {
+          activeCore.injectCpuState(0x80000000, new Array(32).fill(0));
+        }
+
         const uartOutput = activeCore.readVirtualUart();
         if (uartOutput) {
-          // Wasm側のシリアルポートから出力された文字列を、画面下の要素にそっくり代入
           logTerminalEl.textContent = uartOutput;
-          // 常に最新のログが見えるように自動最下部スクロール
           logTerminalEl.scrollTop = logTerminalEl.scrollHeight;
         }
       }
       requestAnimationFrame(pollUartLog);
     };
-    // ログ監視のループを開始
     requestAnimationFrame(pollUartLog);
   }
 }
